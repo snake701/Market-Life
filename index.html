@@ -20,6 +20,10 @@
             -webkit-appearance: none; 
             margin: 0; 
         }
+        /* 自定義 datalist 的箭頭 (部分瀏覽器支援) */
+        input::-webkit-calendar-picker-indicator {
+            opacity: 0.5;
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 h-screen overflow-hidden flex flex-col">
@@ -68,28 +72,31 @@
                     <h2 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4 border-b pb-2">新增今日紀錄</h2>
                     
                     <form id="entryForm" class="space-y-4">
-                        <!-- 第一行：日期與場地 -->
-                        <div class="grid grid-cols-2 gap-3">
+                        <!-- 第一區塊：日期與場地 (改為垂直排列，避免重疊) -->
+                        <div class="space-y-3">
                             <div>
                                 <label class="block text-xs font-medium text-gray-500 mb-1">日期</label>
                                 <input type="date" id="dateInput" required 
                                     class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-gray-500 mb-1">場地</label>
-                                <select id="venueInput" 
-                                    class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition appearance-none">
-                                    <option value="中山市集">中山市集</option>
-                                    <option value="信義商圈">信義商圈</option>
-                                    <option value="華山文創">華山文創</option>
-                                    <option value="松菸誠品">松菸誠品</option>
-                                    <option value="西門紅樓">西門紅樓</option>
-                                    <option value="其他">其他</option>
-                                </select>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">場地 (可選取或自行輸入)</label>
+                                <!-- 改用 input list 實作可選可填 -->
+                                <input list="venueOptions" id="venueInput" type="text" placeholder="輸入或選擇場地..." required
+                                    class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                                <datalist id="venueOptions">
+                                    <option value="中山市集">
+                                    <option value="信義商圈">
+                                    <option value="華山文創">
+                                    <option value="松菸誠品">
+                                    <option value="西門紅樓">
+                                    <option value="公館市集">
+                                    <option value="圓山花博">
+                                </datalist>
                             </div>
                         </div>
 
-                        <!-- 第二行：業績 (僅紀錄用) -->
+                        <!-- 第二區塊：業績 (僅紀錄用) -->
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">目標業績 / 銷售額</label>
                             <div class="relative">
@@ -99,7 +106,7 @@
                             </div>
                         </div>
 
-                        <!-- 第三行：營收與租金 -->
+                        <!-- 第三區塊：營收與租金 -->
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs font-medium text-gray-500 mb-1 text-green-600">實際營收 (+)</label>
@@ -205,11 +212,16 @@
             e.preventDefault();
 
             const date = document.getElementById('dateInput').value;
-            const venue = document.getElementById('venueInput').value;
+            const venue = document.getElementById('venueInput').value; // 這裡會抓到 datalist 或手動輸入的值
             const sales = parseInt(document.getElementById('salesInput').value) || 0;
             const revenue = parseInt(document.getElementById('revenueInput').value) || 0;
             const rent = parseInt(document.getElementById('rentInput').value) || 0;
             const net = revenue - rent;
+
+            if (!venue) {
+                alert("請輸入場地");
+                return;
+            }
 
             const newRecord = {
                 id: Date.now(), // 用時間戳記當 ID
@@ -229,6 +241,7 @@
             document.getElementById('salesInput').value = '';
             document.getElementById('revenueInput').value = '';
             document.getElementById('rentInput').value = '';
+            document.getElementById('venueInput').value = ''; // 場地也重置方便下一筆
             document.getElementById('calculatedNet').innerText = '$0';
             document.getElementById('calculatedNet').className = "text-xl font-black text-gray-400";
             
