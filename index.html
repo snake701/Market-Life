@@ -27,7 +27,10 @@
         <!-- Header: 調整 Padding 讓手機版顯示更自然 -->
         <header class="bg-indigo-600 text-white p-4 flex justify-between items-center shadow-md z-10 shrink-0">
             <div>
-                <h1 class="text-xl font-bold"><i class="fas fa-cloud mr-2"></i>擺攤記帳 (雲端)</h1>
+                <h1 class="text-xl font-bold flex items-center">
+                    <i class="fas fa-cloud mr-2"></i>擺攤記帳
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.2</span>
+                </h1>
                 <p class="text-indigo-200 text-xs" id="userStatus">正在連線雲端...</p>
             </div>
             <div class="flex gap-3">
@@ -142,6 +145,22 @@
                     </button>
                 </div>
             </div>
+            
+            <!-- 新增：篩選工具列 -->
+            <div class="p-3 bg-white border-b border-gray-100 grid grid-cols-2 gap-3 shrink-0">
+                <div>
+                    <label class="text-xs text-gray-500 mb-1 block font-medium">月份篩選</label>
+                    <input type="month" id="filterMonth" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="relative">
+                    <label class="text-xs text-gray-500 mb-1 block font-medium">場地搜尋</label>
+                    <input type="text" id="filterVenue" placeholder="輸入關鍵字..." class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button id="btnClearFilter" class="absolute right-2 bottom-1.5 text-gray-400 hover:text-gray-600 text-xs hidden">
+                        <i class="fas fa-times-circle"></i>
+                    </button>
+                </div>
+            </div>
+
             <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
                 <div id="fullHistoryList" class="space-y-3"></div>
             </div>
@@ -273,6 +292,7 @@
                     ...doc.data()
                 }));
                 updateUI();
+                applyFilters(); // 資料更新時也重新應用篩選
             }, (error) => {
                 console.error("讀取資料錯誤:", error);
                 // 若權限不足可能是規則沒開，或路徑問題
@@ -387,6 +407,47 @@
             reader.readAsArrayBuffer(file);
         }
 
+        // ================= Filter Logic =================
+        const filterMonth = document.getElementById('filterMonth');
+        const filterVenue = document.getElementById('filterVenue');
+        const btnClearFilter = document.getElementById('btnClearFilter');
+
+        // 監聽篩選變更
+        filterMonth.addEventListener('change', applyFilters);
+        filterVenue.addEventListener('input', () => {
+            if(filterVenue.value) btnClearFilter.classList.remove('hidden');
+            else btnClearFilter.classList.add('hidden');
+            applyFilters();
+        });
+        
+        // 清除場地搜尋
+        btnClearFilter.addEventListener('click', () => {
+            filterVenue.value = '';
+            btnClearFilter.classList.add('hidden');
+            applyFilters();
+        });
+
+        function applyFilters() {
+            let filteredRecords = [...records];
+            
+            // 1. 月份篩選 (格式: YYYY-MM)
+            const monthVal = filterMonth.value;
+            if (monthVal) {
+                filteredRecords = filteredRecords.filter(r => r.date.startsWith(monthVal));
+            }
+
+            // 2. 場地/主辦單位搜尋
+            const venueVal = filterVenue.value.trim().toLowerCase();
+            if (venueVal) {
+                filteredRecords = filteredRecords.filter(r => 
+                    (r.venue && r.venue.toLowerCase().includes(venueVal)) || 
+                    (r.organizer && r.organizer.toLowerCase().includes(venueVal))
+                );
+            }
+
+            renderList('fullHistoryList', filteredRecords);
+        }
+
         // ================= Sync Logic =================
         
         const syncModal = document.getElementById('syncModal');
@@ -441,13 +502,18 @@
             document.getElementById('totalEventsBadge').innerText = `${records.length} 場`;
 
             renderList('recentList', records.slice(0, 3));
-            renderList('fullHistoryList', records);
+            // fullHistoryList 由 applyFilters 更新，避免覆蓋篩選結果
+            applyFilters(); 
         }
 
         function renderList(elementId, data) {
             const container = document.getElementById(elementId);
             if (data.length === 0) {
-                container.innerHTML = `<div class="text-center py-8 text-gray-400 text-sm flex flex-col items-center"><i class="fas fa-cloud text-3xl mb-2 opacity-30"></i>雲端尚無紀錄</div>`;
+                if (elementId === 'fullHistoryList' && records.length > 0) {
+                    container.innerHTML = `<div class="text-center py-8 text-gray-400 text-sm flex flex-col items-center"><i class="fas fa-search text-3xl mb-2 opacity-30"></i>沒有符合篩選的紀錄</div>`;
+                } else {
+                    container.innerHTML = `<div class="text-center py-8 text-gray-400 text-sm flex flex-col items-center"><i class="fas fa-cloud text-3xl mb-2 opacity-30"></i>雲端尚無紀錄</div>`;
+                }
                 return;
             }
 
@@ -511,6 +577,7 @@
         document.getElementById('btnExport').onclick = function() {
             if (records.length === 0) { alert("沒有資料"); return; }
             const data = [["日期", "場地", "主辦單位", "目標業績", "營收", "租金", "實收"]];
+            // 這裡修正：匯出時應考慮篩選後的資料，或者詢問用戶。目前維持匯出全部資料。
             records.forEach(r => data.push([r.date, r.venue, r.organizer||'', r.sales, r.revenue, r.rent, r.net]));
             const ws = XLSX.utils.aoa_to_sheet(data);
             const wb = XLSX.utils.book_new();
