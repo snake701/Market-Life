@@ -12,15 +12,15 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <style>
-        /* 核心修正：鎖定視窗，防止輸入時畫面偏移 */
+        /* 鎖定視窗，防止輸入時畫面偏移 */
         html, body {
             width: 100%;
             height: 100%;
-            overflow-x: hidden; /* 禁止左右滑動 */
-            position: fixed; /* 固定頁面 */
+            overflow-x: hidden;
+            position: fixed;
             top: 0;
             left: 0;
-            overscroll-behavior: none; /* 禁止彈性滾動 */
+            overscroll-behavior: none;
             -webkit-tap-highlight-color: transparent;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
         }
@@ -47,7 +47,7 @@
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.4.0</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.4.1</span>
                 </h1>
                 <p class="text-indigo-200 text-xs flex items-center gap-1" id="userStatus">
                     <i class="fas fa-circle-notch fa-spin"></i> 正在連線...
@@ -86,7 +86,6 @@
                     <h2 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4 border-b pb-2">新增紀錄 (同步至雲端)</h2>
                     
                     <form id="entryForm" class="space-y-3">
-                        
                         <!-- 1. 日期 -->
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">日期</label>
@@ -210,6 +209,13 @@
                     <p class="text-xs text-gray-400 mt-1">* 建議複製此代碼到另一台裝置輸入</p>
                 </div>
 
+                <!-- 診斷資訊 -->
+                <div class="mb-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 border border-gray-200">
+                    <p class="font-bold mb-1">連線診斷資訊：</p>
+                    <p>連線專案 ID: <span id="debugProjectId" class="font-mono text-indigo-600 select-all">checking...</span></p>
+                    <p class="mt-1 text-[10px] text-gray-400">* 手機與電腦的 ID 必須相同才能同步</p>
+                </div>
+
                 <div class="flex gap-3">
                     <button id="btnCancelSync" class="flex-1 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition">取消</button>
                     <button id="btnSaveSync" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">儲存並同步</button>
@@ -225,8 +231,10 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, onSnapshot, query, orderBy, doc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 使用者提供的配置
-        const userFirebaseConfig = {
+        // ==========================================
+        // 1. 強制使用您的設定，移除所有自動切換邏輯
+        // ==========================================
+        const firebaseConfig = {
             apiKey: "AIzaSyAtj6uPha5PNX4_c2EIyF-NQ2G8Jshv75g",
             authDomain: "market-life-309fe.firebaseapp.com",
             projectId: "market-life-309fe",
@@ -235,7 +243,7 @@
             appId: "1:143823003012:web:fd53ef47c12aab9317d1d1"
         };
 
-        let firebaseConfig = userFirebaseConfig; // 強制使用使用者配置
+        // 初始化變數
         let app, auth, db, user;
         let records = [];
         let unsubscribe = null; 
@@ -250,10 +258,12 @@
         // 初始化 APP
         function initApp() {
             try {
-                // 強制使用使用者的 config 初始化
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
+
+                // 更新診斷資訊
+                document.getElementById('debugProjectId').innerText = firebaseConfig.projectId;
 
                 onAuthStateChanged(auth, (currentUser) => {
                     if (currentUser) {
@@ -280,10 +290,8 @@
             }
         }
 
-        // 取得路徑 (修正重點：移除 Canvas 判斷，統一使用 stores 路徑)
+        // 取得路徑 - 統一使用 Stores 結構
         function getCollectionRef() {
-            // 無論在哪裡執行，都使用 stores/{storeId}/records 結構
-            // 這樣才能實現跨裝置同步
             return collection(db, 'stores', currentStoreId, 'records');
         }
 
@@ -442,7 +450,7 @@
                 if(confirm("確定切換商店代碼？")) {
                     currentStoreId = newId;
                     localStorage.setItem('vendor_store_id', currentStoreId);
-                    document.getElementById('userStatus').innerText = `已連線 (商店: ${currentStoreId})`;
+                    document.getElementById('userStatus').innerHTML = `<i class="fas fa-check-circle text-green-300"></i> 已連線 (商店: ${currentStoreId.slice(0,8)}...)`;
                     syncModal.classList.add('hidden');
                     startListeningData();
                 }
