@@ -154,10 +154,18 @@
         <div id="historyView" class="absolute inset-0 bg-white transform translate-x-full transition-transform duration-300 z-20 flex flex-col">
             <div class="bg-gray-100 p-4 pt-8 flex justify-between items-center border-b border-gray-200">
                 <h2 class="font-bold text-lg text-gray-800">歷史明細</h2>
+                
+                <!-- 隱藏的檔案輸入框，用於匯入 -->
+                <input type="file" id="importFile" accept=".xlsx, .xls" class="hidden" onchange="handleImport(this)">
+
                 <div class="flex gap-2">
+                    <!-- 新增：匯入按鈕 -->
+                    <button onclick="triggerImport()" class="text-orange-500 text-sm px-3 py-1 bg-white rounded border border-orange-200 shadow-sm hover:bg-orange-50 transition">
+                        <i class="fas fa-file-import mr-1"></i>匯入
+                    </button>
                     <!-- 修改：Excel 匯出按鈕 -->
                     <button onclick="exportToExcel()" class="text-green-600 text-sm px-3 py-1 bg-white rounded border border-green-200 shadow-sm hover:bg-green-50 transition">
-                        <i class="fas fa-file-excel mr-1"></i>Excel
+                        <i class="fas fa-file-excel mr-1"></i>匯出
                     </button>
                     <button onclick="clearAllData()" class="text-red-500 text-sm px-3 py-1 bg-white rounded border border-red-200 shadow-sm hover:bg-red-50 transition">
                         <i class="fas fa-trash-alt mr-1"></i>清空
@@ -314,6 +322,72 @@
             XLSX.writeFile(wb, `擺攤紀錄_${today}.xlsx`);
         }
 
+        // 觸發匯入
+        function triggerImport() {
+            document.getElementById('importFile').click();
+        }
+
+        // 處理匯入
+        function handleImport(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            if(!confirm("匯入資料將會與您目前的資料合併，確定要繼續嗎？")) {
+                input.value = ''; // 清空選擇
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    
+                    // 假設讀取第一個工作表
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // 轉為 JSON
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    let importCount = 0;
+                    
+                    // 將 Excel 欄位對應回程式邏輯
+                    jsonData.forEach(row => {
+                        // 簡單檢核必要欄位
+                        if(row['日期'] && row['場地']) {
+                            const newRecord = {
+                                id: Date.now() + Math.floor(Math.random() * 1000), // 產生新 ID 避免衝突
+                                date: row['日期'], // 需注意 Excel 日期格式，若為純文字則OK
+                                venue: row['場地'],
+                                organizer: row['主辦單位'] || '',
+                                sales: parseInt(row['目標業績']) || 0,
+                                revenue: parseInt(row['營收']) || 0,
+                                rent: parseInt(row['租金']) || 0,
+                                net: (parseInt(row['營收']) || 0) - (parseInt(row['租金']) || 0)
+                            };
+                            
+                            // 加到現有資料中 (這裡選擇排在最前面)
+                            records.unshift(newRecord);
+                            importCount++;
+                        }
+                    });
+
+                    saveData();
+                    updateUI();
+                    alert(`成功匯入 ${importCount} 筆資料！`);
+
+                } catch (error) {
+                    console.error(error);
+                    alert("匯入失敗，請確認檔案格式是否正確。建議先匯出一次看格式。");
+                }
+                
+                // 清空 input 讓下次可以再選同個檔案
+                input.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
         // 更新 UI (儀表板 + 列表)
         function updateUI() {
             // 1. 計算總合
@@ -352,8 +426,16 @@
                 const netSign = isPositive ? '+' : '';
                 
                 // 格式化日期 (MM/DD)
-                const dateObj = new Date(r.date);
-                const dateStr = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+                // 處理匯入可能造成的日期格式差異 (若是 Excel 序列號需額外處理，這裡假設是字串)
+                let dateStr = "未知日期";
+                try {
+                    const dateObj = new Date(r.date);
+                    if (!isNaN(dateObj)) {
+                        dateStr = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+                    } else {
+                        dateStr = r.date; // 如果無法解析，直接顯示原始字串
+                    }
+                } catch(e) { dateStr = r.date; }
                 
                 // 主辦單位顯示邏輯
                 const organizerHtml = r.organizer 
