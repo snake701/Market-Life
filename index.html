@@ -25,9 +25,15 @@
                 <h1 class="text-xl font-bold"><i class="fas fa-cloud mr-2"></i>擺攤記帳 (雲端)</h1>
                 <p class="text-indigo-200 text-xs" id="userStatus">正在連線雲端...</p>
             </div>
-            <button id="btnToggleHistory" class="text-white hover:text-indigo-200 transition">
-                <i class="fas fa-list-ul text-xl"></i>
-            </button>
+            <div class="flex gap-3">
+                <!-- 新增：同步按鈕 -->
+                <button id="btnOpenSync" class="text-white hover:text-indigo-200 transition" title="跨裝置同步">
+                    <i class="fas fa-sync-alt text-xl"></i>
+                </button>
+                <button id="btnToggleHistory" class="text-white hover:text-indigo-200 transition" title="歷史紀錄">
+                    <i class="fas fa-list-ul text-xl"></i>
+                </button>
+            </div>
         </header>
 
         <main class="flex-1 overflow-y-auto pb-24 bg-gray-50" id="mainView">
@@ -134,17 +140,39 @@
                 <div id="fullHistoryList" class="space-y-3"></div>
             </div>
         </div>
+
+        <!-- Sync Settings Modal -->
+        <div id="syncModal" class="absolute inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+                <h3 class="text-lg font-bold text-gray-800 mb-2"><i class="fas fa-sync-alt mr-2 text-indigo-500"></i>跨裝置同步設定</h3>
+                <p class="text-sm text-gray-500 mb-4">若要在不同裝置 (手機/電腦) 看到相同資料，請確保兩邊的「商店代碼」一致。</p>
+                
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">您的商店代碼 (Store ID)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="storeIdInput" class="flex-1 bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono text-center tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase" placeholder="輸入代碼">
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">* 建議複製此代碼到另一台裝置輸入</p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="btnCancelSync" class="flex-1 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition">取消</button>
+                    <button id="btnSaveSync" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">儲存並同步</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Firebase Logic (Module Type) -->
     <script type="module">
-        // 匯入 Firebase SDK (使用兼容版本以確保在不同環境的穩定性)
+        // 匯入 Firebase SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, onSnapshot, query, orderBy, doc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ==========================================
-        // 重要：使用者請在此處填入您的 Firebase 設定
+        // Firebase 設定
         // ==========================================
         const userFirebaseConfig = {
             apiKey: "AIzaSyAtj6uPha5PNX4_c2EIyF-NQ2G8Jshv75g",
@@ -155,28 +183,36 @@
             appId: "1:143823003012:web:fd53ef47c12aab9317d1d1"
         };
 
-        // 系統邏輯：自動判斷是使用 Canvas 預覽環境還是使用者的設定
+        // 系統邏輯
         let firebaseConfig;
         let appId = 'default';
+        let isCanvasEnvironment = false;
 
         if (typeof __firebase_config !== 'undefined') {
-            // Canvas 預覽環境
             firebaseConfig = JSON.parse(__firebase_config);
             if(typeof __app_id !== 'undefined') appId = __app_id;
+            isCanvasEnvironment = true;
         } else {
-            // 使用者自定義環境 (GitHub Pages 等)
             firebaseConfig = userFirebaseConfig;
         }
 
         // 初始化變數
         let app, auth, db, user;
         let records = [];
+        let unsubscribe = null; // 用於切換商店時取消監聽
+
+        // 管理 Store ID
+        // 優先從 localStorage 讀取，若無則產生隨機 ID
+        let currentStoreId = localStorage.getItem('vendor_store_id');
+        if (!currentStoreId) {
+            currentStoreId = 'store_' + Math.random().toString(36).substr(2, 6).toUpperCase();
+            localStorage.setItem('vendor_store_id', currentStoreId);
+        }
 
         // 啟動 Firebase
         function initApp() {
-            // 檢查是否有設定檔
             if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                alert("【尚未設定資料庫】\n請編輯 index.html 檔案，填入您的 userFirebaseConfig 內容，才能啟用雲端功能！");
+                alert("請先設定 Firebase Config");
                 return;
             }
 
@@ -184,12 +220,11 @@
             auth = getAuth(app);
             db = getFirestore(app);
 
-            // 登入監聽
             onAuthStateChanged(auth, (currentUser) => {
                 if (currentUser) {
                     user = currentUser;
-                    document.getElementById('userStatus').innerText = `已連線 (ID: ${user.uid.slice(0,5)}...)`;
-                    startListeningData(); // 登入成功後開始監聽資料
+                    document.getElementById('userStatus').innerText = `已連線 (商店: ${currentStoreId})`;
+                    startListeningData(); 
                 } else {
                     document.getElementById('userStatus').innerText = "連線中...";
                     signInAnonymously(auth).catch((error) => {
@@ -200,18 +235,32 @@
             });
         }
 
-        // 監聽 Firestore 資料變更 (取代 localStorage)
+        // 取得資料庫路徑 (關鍵邏輯)
+        function getCollectionRef() {
+            if (isCanvasEnvironment) {
+                // Canvas 預覽環境：強制使用 User ID (遵守平台規則)
+                return collection(db, 'artifacts', appId, 'users', user.uid, 'records');
+            } else {
+                // 用戶正式環境：使用 Shared Store ID 實現同步
+                // 路徑結構: stores/{storeId}/records
+                return collection(db, 'stores', currentStoreId, 'records');
+            }
+        }
+
+        // 監聽 Firestore 資料
         function startListeningData() {
             if (!user) return;
+            
+            // 如果之前有監聽，先取消
+            if (unsubscribe) {
+                unsubscribe();
+            }
 
-            // 定義資料路徑 (區分不同使用者)
-            const collectionPath = typeof __firebase_config !== 'undefined' 
-                ? collection(db, 'artifacts', appId, 'users', user.uid, 'records') // Canvas 路徑規則
-                : collection(db, 'users', user.uid, 'records'); // 一般使用者路徑規則
+            const collectionRef = getCollectionRef();
+            const q = query(collectionRef, orderBy('date', 'desc'));
 
-            const q = query(collectionPath, orderBy('date', 'desc'));
-
-            onSnapshot(q, (snapshot) => {
+            // 開始監聽並保存 unsubscribe function
+            unsubscribe = onSnapshot(q, (snapshot) => {
                 records = snapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
@@ -219,13 +268,14 @@
                 updateUI();
             }, (error) => {
                 console.error("讀取資料錯誤:", error);
+                // 若權限不足可能是規則沒開，或路徑問題
             });
         }
 
-        // 新增資料 (上傳至 Firestore)
+        // 新增資料
         async function addRecord(e) {
             e.preventDefault();
-            if (!user) { alert("尚未連線到資料庫"); return; }
+            if (!user) { alert("尚未連線"); return; }
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
@@ -243,17 +293,14 @@
 
                 const newRecord = {
                     date, venue, organizer, sales, revenue, rent, net,
-                    createdAt: Timestamp.now()
+                    createdAt: Timestamp.now(),
+                    createdBy: user.uid // 紀錄是誰建的
                 };
 
-                // 寫入資料庫
-                const collectionPath = typeof __firebase_config !== 'undefined' 
-                    ? collection(db, 'artifacts', appId, 'users', user.uid, 'records')
-                    : collection(db, 'users', user.uid, 'records');
+                const collectionRef = getCollectionRef();
+                await addDoc(collectionRef, newRecord);
 
-                await addDoc(collectionPath, newRecord);
-
-                // 重置表單
+                // Reset Form
                 document.getElementById('salesInput').value = '';
                 document.getElementById('revenueInput').value = '';
                 document.getElementById('rentInput').value = '';
@@ -275,44 +322,41 @@
 
         // 刪除資料
         window.deleteRecord = async function(docId) {
-            if(!confirm("確定要刪除這筆雲端紀錄嗎？")) return;
-            
+            if(!confirm("確定要刪除這筆紀錄嗎？")) return;
             try {
-                const docPath = typeof __firebase_config !== 'undefined'
-                    ? doc(db, 'artifacts', appId, 'users', user.uid, 'records', docId)
-                    : doc(db, 'users', user.uid, 'records', docId);
-                
-                await deleteDoc(docPath);
+                // 必須重新建構 doc reference，因為 docId 來自列表
+                let docRef;
+                if (isCanvasEnvironment) {
+                    docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'records', docId);
+                } else {
+                    docRef = doc(db, 'stores', currentStoreId, 'records', docId);
+                }
+                await deleteDoc(docRef);
             } catch (error) {
                 console.error("刪除失敗:", error);
                 alert("刪除失敗");
             }
         };
 
-        // 匯入 Excel 到雲端
+        // 匯入 Excel
         async function handleImport(input) {
             const file = input.files[0];
             if (!file) return;
-            if(!confirm("這會將 Excel 資料上傳到雲端，確定嗎？")) { input.value = ''; return; }
+            if(!confirm("確定要將 Excel 資料匯入此商店嗎？")) { input.value = ''; return; }
 
             const reader = new FileReader();
             reader.onload = async function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, {type: 'array'});
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
                     
                     let count = 0;
-                    const collectionPath = typeof __firebase_config !== 'undefined' 
-                        ? collection(db, 'artifacts', appId, 'users', user.uid, 'records')
-                        : collection(db, 'users', user.uid, 'records');
+                    const collectionRef = getCollectionRef();
 
-                    // 批次寫入通常較複雜，這裡使用迴圈單筆寫入
                     for (const row of jsonData) {
                         if(row['日期'] && row['場地']) {
-                            await addDoc(collectionPath, {
+                            await addDoc(collectionRef, {
                                 date: row['日期'],
                                 venue: row['場地'],
                                 organizer: row['主辦單位'] || '',
@@ -320,22 +364,61 @@
                                 revenue: parseInt(row['營收']) || 0,
                                 rent: parseInt(row['租金']) || 0,
                                 net: (parseInt(row['營收']) || 0) - (parseInt(row['租金']) || 0),
-                                createdAt: Timestamp.now()
+                                createdAt: Timestamp.now(),
+                                createdBy: user.uid
                             });
                             count++;
                         }
                     }
-                    alert(`成功上傳 ${count} 筆資料到雲端！`);
+                    alert(`成功匯入 ${count} 筆資料！`);
                 } catch (error) {
                     console.error(error);
-                    alert("匯入失敗，請檢查格式。");
+                    alert("匯入失敗");
                 }
                 input.value = '';
             };
             reader.readAsArrayBuffer(file);
         }
 
-        // ================= UI 邏輯 =================
+        // ================= Sync Logic =================
+        
+        const syncModal = document.getElementById('syncModal');
+        const storeIdInput = document.getElementById('storeIdInput');
+
+        // 打開同步視窗
+        document.getElementById('btnOpenSync').onclick = () => {
+            storeIdInput.value = currentStoreId;
+            syncModal.classList.remove('hidden');
+        };
+
+        // 關閉同步視窗
+        document.getElementById('btnCancelSync').onclick = () => {
+            syncModal.classList.add('hidden');
+        };
+
+        // 儲存新的 Store ID
+        document.getElementById('btnSaveSync').onclick = () => {
+            const newId = storeIdInput.value.trim();
+            if (!newId) { alert("代碼不能為空"); return; }
+            
+            if (newId !== currentStoreId) {
+                if(confirm("切換代碼後，目前的畫面將會重新整理以載入新代碼的資料，確定嗎？")) {
+                    currentStoreId = newId;
+                    localStorage.setItem('vendor_store_id', currentStoreId);
+                    
+                    // 更新 UI 狀態
+                    document.getElementById('userStatus').innerText = `已連線 (商店: ${currentStoreId})`;
+                    syncModal.classList.add('hidden');
+                    
+                    // 重新啟動監聽 (載入新資料)
+                    startListeningData();
+                }
+            } else {
+                syncModal.classList.add('hidden');
+            }
+        };
+
+        // ================= UI Logic =================
 
         function updateUI() {
             let totalNet = 0, totalRevenue = 0, totalRent = 0;
@@ -367,7 +450,6 @@
                 const netColorClass = isPositive ? 'text-green-600' : 'text-red-500';
                 const organizerHtml = r.organizer ? `<div class="text-xs text-indigo-500 mb-0.5"><i class="fas fa-user-tag mr-1 text-[10px]"></i>${r.organizer}</div>` : '';
                 
-                // 處理日期顯示
                 let dateDisplay = r.date;
                 try {
                     const d = new Date(r.date);
@@ -399,16 +481,14 @@
             });
             container.innerHTML = html;
         }
-
-        // ================= 事件綁定 =================
         
-        // 頁面載入執行
+        // Window Load
         window.onload = function() {
             document.getElementById('dateInput').valueAsDate = new Date();
             initApp();
         };
 
-        // 計算實收 (純前端邏輯)
+        // UI Event Bindings
         window.calculateNet = function() {
             const revenue = parseInt(document.getElementById('revenueInput').value) || 0;
             const rent = parseInt(document.getElementById('rentInput').value) || 0;
@@ -420,10 +500,7 @@
             else display.className = "text-xl font-black text-gray-400";
         };
 
-        // 綁定按鈕事件 (因為 module scope 無法直接在 HTML onclick 呼叫，需在此綁定)
         document.getElementById('entryForm').onsubmit = addRecord;
-        
-        // 匯出 Excel
         document.getElementById('btnExport').onclick = function() {
             if (records.length === 0) { alert("沒有資料"); return; }
             const data = [["日期", "場地", "主辦單位", "目標業績", "營收", "租金", "實收"]];
@@ -431,18 +508,12 @@
             const ws = XLSX.utils.aoa_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "擺攤紀錄");
-            XLSX.writeFile(wb, `擺攤紀錄_雲端備份_${new Date().toISOString().slice(0,10)}.xlsx`);
+            XLSX.writeFile(wb, `擺攤紀錄_商店${currentStoreId}_${new Date().toISOString().slice(0,10)}.xlsx`);
         };
-
-        // 匯入按鈕與事件
         document.getElementById('btnImport').onclick = () => document.getElementById('importFile').click();
         document.getElementById('importFile').onchange = (e) => handleImport(e.target);
-
-        // 歷史頁面開關
-        const toggleHistory = () => {
-            const view = document.getElementById('historyView');
-            view.classList.toggle('translate-x-full');
-        };
+        
+        const toggleHistory = () => document.getElementById('historyView').classList.toggle('translate-x-full');
         document.getElementById('btnToggleHistory').onclick = toggleHistory;
         document.getElementById('btnViewAll').onclick = toggleHistory;
         document.getElementById('btnCloseHistory').onclick = toggleHistory;
