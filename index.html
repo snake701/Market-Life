@@ -17,26 +17,32 @@
         /* 隱藏滾動條但保留功能 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 修正 iOS 日期輸入框的預設高度與外觀 */
+        input[type="date"] {
+            -webkit-appearance: none;
+            appearance: none;
+            min-height: 2.75rem; /* 對應 h-11 */
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 h-[100dvh] overflow-hidden flex flex-col">
 
-    <!-- 調整：確保高度填滿移動裝置視窗 (h-full) -->
+    <!-- App Container -->
     <div class="w-full max-w-md mx-auto bg-white h-full flex flex-col shadow-2xl relative">
 
-        <!-- Header: 調整 Padding 讓手機版顯示更自然 -->
+        <!-- Header -->
         <header class="bg-indigo-600 text-white p-4 flex justify-between items-center shadow-md z-10 shrink-0">
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.5</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.8</span>
                 </h1>
                 <p class="text-indigo-200 text-xs flex items-center gap-1" id="userStatus">
                     <i class="fas fa-circle-notch fa-spin"></i> 正在連線雲端...
                 </p>
             </div>
             <div class="flex gap-3">
-                <!-- 同步按鈕 -->
                 <button id="btnOpenSync" class="text-white hover:text-indigo-200 transition" title="跨裝置同步">
                     <i class="fas fa-sync-alt text-xl"></i>
                 </button>
@@ -68,41 +74,50 @@
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                     <h2 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4 border-b pb-2">新增紀錄 (同步至雲端)</h2>
                     
-                    <form id="entryForm" class="space-y-4">
-                        <!-- 修正：Grid 排版加入 min-w-0 防止內容溢出導致重疊 -->
-                        <div class="grid grid-cols-2 gap-3">
-                            <div class="min-w-0">
-                                <label class="block text-xs font-medium text-gray-500 mb-1">日期</label>
-                                <input type="date" id="dateInput" required class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
-                            </div>
-                            <div class="min-w-0">
-                                <label class="block text-xs font-medium text-gray-500 mb-1">主辦單位</label>
-                                <input type="text" id="organizerInput" placeholder="選填" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
-                            </div>
-                        </div>
+                    <form id="entryForm" class="space-y-3">
                         
-                        <!-- 場地單獨一排 -->
+                        <!-- 1. 日期 -->
                         <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">場地</label>
-                            <input type="text" id="venueInput" placeholder="請輸入場地名稱" required class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">日期</label>
+                            <input type="date" id="dateInput" required 
+                                class="w-full h-11 bg-gray-50 border border-gray-200 rounded-lg px-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                         </div>
 
+                        <!-- 2. 目標業績 -->
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">目標業績</label>
                             <div class="relative">
-                                <span class="absolute left-3 top-2 text-gray-400 text-sm">$</span>
-                                <input type="number" id="salesInput" placeholder="0" inputmode="numeric" class="w-full bg-gray-50 border border-gray-200 rounded-lg pl-7 pr-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                                <span class="absolute left-3 top-3 text-gray-400 text-sm">$</span>
+                                <input type="number" id="salesInput" placeholder="0" inputmode="numeric" 
+                                    class="w-full h-11 bg-gray-50 border border-gray-200 rounded-lg pl-7 pr-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3">
+                        <!-- 3. 主辦單位 -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">主辦單位</label>
+                            <input type="text" id="organizerInput" placeholder="選填" 
+                                class="w-full h-11 bg-gray-50 border border-gray-200 rounded-lg px-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                        </div>
+                        
+                        <!-- 4. 場地 -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">場地</label>
+                            <input type="text" id="venueInput" placeholder="請輸入場地名稱" required 
+                                class="w-full h-11 bg-gray-50 border border-gray-200 rounded-lg px-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                        </div>
+
+                        <!-- 5. 營收與租金 -->
+                        <div class="grid grid-cols-2 gap-3 pt-1">
                             <div>
                                 <label class="block text-xs font-medium text-gray-500 mb-1 text-green-600">營收 (+)</label>
-                                <input type="number" id="revenueInput" placeholder="0" inputmode="numeric" oninput="calculateNet()" required class="w-full bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-base text-green-700 font-bold focus:outline-none focus:ring-2 focus:ring-green-500 transition text-right">
+                                <input type="number" id="revenueInput" placeholder="0" inputmode="numeric" oninput="calculateNet()" required 
+                                    class="w-full h-11 bg-green-50 border border-green-200 rounded-lg px-3 text-base text-green-700 font-bold focus:outline-none focus:ring-2 focus:ring-green-500 transition text-right">
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-gray-500 mb-1 text-red-500">租金 (-)</label>
-                                <input type="number" id="rentInput" placeholder="0" inputmode="numeric" oninput="calculateNet()" required class="w-full bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-base text-red-700 font-bold focus:outline-none focus:ring-2 focus:ring-red-500 transition text-right">
+                                <input type="number" id="rentInput" placeholder="0" inputmode="numeric" oninput="calculateNet()" required 
+                                    class="w-full h-11 bg-red-50 border border-red-200 rounded-lg px-3 text-base text-red-700 font-bold focus:outline-none focus:ring-2 focus:ring-red-500 transition text-right">
                             </div>
                         </div>
 
@@ -113,7 +128,7 @@
                             </div>
                         </div>
 
-                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-200 active:scale-95 transition flex justify-center items-center gap-2">
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-200 active:scale-95 transition flex justify-center items-center gap-2 h-12 mt-2">
                             <i class="fas fa-cloud-upload-alt"></i> 儲存到雲端
                         </button>
                     </form>
@@ -150,16 +165,16 @@
                 </div>
             </div>
             
-            <!-- 調整：篩選工具列改為垂直排列 (flex-col) 避免重疊 -->
+            <!-- 篩選工具列 -->
             <div class="p-3 bg-white border-b border-gray-100 flex flex-col gap-3 shrink-0">
                 <div>
                     <label class="text-xs text-gray-500 mb-1 block font-medium">月份篩選</label>
-                    <input type="month" id="filterMonth" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="month" id="filterMonth" class="w-full h-10 bg-gray-50 border border-gray-200 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <div class="relative">
                     <label class="text-xs text-gray-500 mb-1 block font-medium">場地搜尋</label>
-                    <input type="text" id="filterVenue" placeholder="輸入關鍵字..." class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <button id="btnClearFilter" class="absolute right-2 bottom-1.5 text-gray-400 hover:text-gray-600 text-xs hidden">
+                    <input type="text" id="filterVenue" placeholder="輸入關鍵字..." class="w-full h-10 bg-gray-50 border border-gray-200 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button id="btnClearFilter" class="absolute right-2 bottom-2 text-gray-400 hover:text-gray-600 text-xs hidden">
                         <i class="fas fa-times-circle"></i>
                     </button>
                 </div>
@@ -179,8 +194,7 @@
                 <div class="mb-4">
                     <label class="block text-xs font-bold text-gray-700 mb-1">您的商店代碼 (Store ID)</label>
                     <div class="flex gap-2">
-                        <!-- 調整：text-base 防止縮放 -->
-                        <input type="text" id="storeIdInput" class="flex-1 bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-base font-mono text-center tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase" placeholder="輸入代碼">
+                        <input type="text" id="storeIdInput" class="flex-1 h-11 bg-gray-100 border border-gray-300 rounded-lg px-3 text-base font-mono text-center tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase" placeholder="輸入代碼">
                     </div>
                     <p class="text-xs text-gray-400 mt-1">* 建議複製此代碼到另一台裝置輸入</p>
                 </div>
@@ -518,7 +532,8 @@
                     localStorage.setItem('vendor_store_id', currentStoreId);
                     
                     // 更新 UI 狀態
-                    document.getElementById('userStatus').innerText = `已連線 (商店: ${currentStoreId})`;
+                    const shortId = currentStoreId.length > 8 ? currentStoreId.slice(0, 8) + '...' : currentStoreId;
+                    document.getElementById('userStatus').innerHTML = `<i class="fas fa-check-circle text-green-300"></i> 已連線 (商店: ${shortId})`;
                     syncModal.classList.add('hidden');
                     
                     // 重新啟動監聽 (載入新資料)
