@@ -29,7 +29,7 @@
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.1</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.2</span>
                 </h1>
                 <p class="text-indigo-200 text-xs" id="userStatus">正在連線雲端...</p>
             </div>
@@ -307,7 +307,9 @@
             if (!user) { alert("尚未連線"); return; }
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
-            const originalText = submitBtn.innerHTML;
+            // 避免重複點擊時抓到 "處理中..." 的文字，固定設定回原始樣式
+            const originalHTML = '<i class="fas fa-cloud-upload-alt"></i> 儲存到雲端';
+            
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
 
@@ -327,7 +329,16 @@
                 };
 
                 const collectionRef = getCollectionRef();
-                await addDoc(collectionRef, newRecord);
+                
+                // 加入 10 秒超時機制，避免網路不通時按鈕卡死
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error("連線回應逾時，請檢查網路狀況")), 10000)
+                );
+
+                await Promise.race([
+                    addDoc(collectionRef, newRecord),
+                    timeoutPromise
+                ]);
 
                 // Reset Form
                 document.getElementById('salesInput').value = '';
@@ -342,10 +353,10 @@
 
             } catch (error) {
                 console.error("新增失敗:", error);
-                alert("新增失敗: " + error.message);
+                alert("新增失敗: " + error.message + "\n(若是權限錯誤，請確認 Firebase 後台是否已開啟 Firestore Database)");
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = originalText;
+                submitBtn.innerHTML = originalHTML;
             }
         }
 
