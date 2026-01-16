@@ -29,7 +29,7 @@
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.4</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.5</span>
                 </h1>
                 <p class="text-indigo-200 text-xs flex items-center gap-1" id="userStatus">
                     <i class="fas fa-circle-notch fa-spin"></i> 正在連線雲端...
@@ -69,13 +69,13 @@
                     <h2 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4 border-b pb-2">新增紀錄 (同步至雲端)</h2>
                     
                     <form id="entryForm" class="space-y-4">
-                        <!-- 調整：第一區塊使用 Grid 讓日期和主辦單位並排 -->
+                        <!-- 修正：Grid 排版加入 min-w-0 防止內容溢出導致重疊 -->
                         <div class="grid grid-cols-2 gap-3">
-                            <div>
+                            <div class="min-w-0">
                                 <label class="block text-xs font-medium text-gray-500 mb-1">日期</label>
                                 <input type="date" id="dateInput" required class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                             </div>
-                            <div>
+                            <div class="min-w-0">
                                 <label class="block text-xs font-medium text-gray-500 mb-1">主辦單位</label>
                                 <input type="text" id="organizerInput" placeholder="選填" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                             </div>
@@ -315,16 +315,7 @@
                 console.error("讀取資料錯誤:", error);
                 if (error.code === 'permission-denied') {
                     document.getElementById('userStatus').innerHTML = `<i class="fas fa-lock text-red-300"></i> 權限不足`;
-                    alert("【權限不足】\n請檢查 Firestore Rules 是否已設為測試模式 (allow read, write: if true;)");
-                } else if (error.code === 'failed-precondition') {
-                     // 可能是因為 query 需要 index，但在這個簡單的 app 中較少見
-                } else {
-                     // 其他讀取錯誤，通常是網路或資料庫未建立
-                     console.log("Firestore error code:", error.code);
-                     if(error.message && error.message.includes("The project")) {
-                         document.getElementById('userStatus').innerHTML = `<i class="fas fa-database text-red-300"></i> 資料庫未建立`;
-                         alert("【資料庫未建立】\n請到 Firebase Console > Firestore Database 點擊「建立資料庫」。");
-                     }
+                    // 不彈出 alert 避免干擾，但顯示在狀態列
                 }
             });
         }
@@ -527,8 +518,7 @@
                     localStorage.setItem('vendor_store_id', currentStoreId);
                     
                     // 更新 UI 狀態
-                    const shortId = currentStoreId.length > 8 ? currentStoreId.slice(0, 8) + '...' : currentStoreId;
-                    document.getElementById('userStatus').innerHTML = `<i class="fas fa-check-circle text-green-300"></i> 已連線 (商店: ${shortId})`;
+                    document.getElementById('userStatus').innerText = `已連線 (商店: ${currentStoreId})`;
                     syncModal.classList.add('hidden');
                     
                     // 重新啟動監聽 (載入新資料)
