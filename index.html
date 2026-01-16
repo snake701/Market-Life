@@ -47,7 +47,7 @@
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.4.2</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.4.3</span>
                 </h1>
                 <p class="text-indigo-200 text-xs flex items-center gap-1" id="userStatus">
                     <i class="fas fa-circle-notch fa-spin"></i> 正在連線...
@@ -163,6 +163,10 @@
                 <h2 class="font-bold text-lg text-gray-800">歷史明細 (雲端)</h2>
                 <input type="file" id="importFile" accept=".xlsx, .xls" class="hidden">
                 <div class="flex gap-2">
+                    <!-- 新增：清空按鈕 -->
+                    <button id="btnDeleteAll" class="text-red-500 text-sm px-3 py-1 bg-white rounded border border-red-200 shadow-sm hover:bg-red-50 transition">
+                        <i class="fas fa-trash-alt mr-1"></i>清空
+                    </button>
                     <button id="btnImport" class="text-orange-500 text-sm px-3 py-1 bg-white rounded border border-orange-200 shadow-sm hover:bg-orange-50 transition">
                         <i class="fas fa-file-import mr-1"></i>匯入
                     </button>
@@ -229,12 +233,12 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, deleteDoc, onSnapshot, query, orderBy, doc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, deleteDoc, getDocs, onSnapshot, query, orderBy, doc, Timestamp, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ==========================================
-        // 1. 強制設定 (移除所有環境判斷，這是關鍵)
+        // Firebase 設定
         // ==========================================
-        const firebaseConfig = {
+        const userFirebaseConfig = {
             apiKey: "AIzaSyAtj6uPha5PNX4_c2EIyF-NQ2G8Jshv75g",
             authDomain: "market-life-309fe.firebaseapp.com",
             projectId: "market-life-309fe",
@@ -242,6 +246,9 @@
             messagingSenderId: "143823003012",
             appId: "1:143823003012:web:fd53ef47c12aab9317d1d1"
         };
+
+        // 系統邏輯 - 強制使用使用者配置
+        const firebaseConfig = userFirebaseConfig;
 
         // 初始化變數
         let app, auth, db, user;
@@ -258,12 +265,10 @@
         // 初始化 APP
         function initApp() {
             try {
-                // 強制使用上面的 config，不做任何判斷
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                // 更新診斷資訊
                 document.getElementById('debugProjectId').innerText = app.options.projectId;
 
                 onAuthStateChanged(auth, (currentUser) => {
@@ -277,10 +282,7 @@
                         signInAnonymously(auth).catch((error) => {
                             console.error("登入失敗:", error);
                             let errorMsg = "連線失敗";
-                            if(error.code === 'auth/operation-not-allowed') {
-                                errorMsg = "未開啟匿名登入";
-                                alert("請至 Firebase Console 開啟匿名登入！");
-                            }
+                            if(error.code === 'auth/operation-not-allowed') errorMsg = "未開啟匿名登入";
                             document.getElementById('userStatus').innerHTML = `<i class="fas fa-times-circle text-red-300"></i> ${errorMsg}`;
                         });
                     }
@@ -291,9 +293,8 @@
             }
         }
 
-        // 取得路徑 - 統一使用 Stores 結構
+        // 取得路徑
         function getCollectionRef() {
-            // 只使用單一路徑，不分環境
             return collection(db, 'stores', currentStoreId, 'records');
         }
 
@@ -371,18 +372,52 @@
             }
         }
 
+        // 單筆刪除功能
         window.deleteRecord = async function(docId) {
-            if(!confirm("確定要刪除？")) return;
+            if(!confirm("確定要刪除這筆紀錄嗎？")) return;
             try {
                 const docRef = doc(db, 'stores', currentStoreId, 'records', docId);
                 await deleteDoc(docRef);
             } catch (error) {
                 console.error("刪除失敗:", error);
-                alert("刪除失敗");
+                alert("刪除失敗: " + error.message);
             }
         };
 
-        // 匯入 Excel 邏輯 (略，與前版相同)
+        // 清空全部資料功能
+        document.getElementById('btnDeleteAll').onclick = async function() {
+            if (records.length === 0) { alert("目前沒有資料可以清空"); return; }
+            const confirmMsg = `警告：您即將刪除本商店 (${currentStoreId}) 的所有 ${records.length} 筆資料。\n\n此動作【無法復原】！\n\n確定要繼續嗎？`;
+            if (!confirm(confirmMsg)) return;
+            
+            // 二次確認
+            if (!confirm("請再次確認：真的要清空所有資料嗎？")) return;
+
+            const btn = document.getElementById('btnDeleteAll');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 刪除中...';
+
+            try {
+                const collectionRef = getCollectionRef();
+                const snapshot = await getDocs(collectionRef);
+                
+                // Firestore 批次刪除限制為 500 筆，這裡簡單實作迴圈刪除
+                // 若資料量極大建議分批，但一般擺攤紀錄應足夠
+                const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+                await Promise.all(deletePromises);
+                
+                alert("已成功清空所有資料。");
+            } catch (error) {
+                console.error("清空失敗:", error);
+                alert("清空失敗: " + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        };
+
+        // 匯入 Excel
         async function handleImport(input) {
             const file = input.files[0];
             if (!file) return;
@@ -418,7 +453,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // 篩選功能
         const filterMonth = document.getElementById('filterMonth');
         const filterVenue = document.getElementById('filterVenue');
         const btnClearFilter = document.getElementById('btnClearFilter');
@@ -440,7 +474,6 @@
         });
         btnClearFilter.onclick = () => { filterVenue.value = ''; btnClearFilter.classList.add('hidden'); applyFilters(); };
 
-        // 同步功能
         const syncModal = document.getElementById('syncModal');
         const storeIdInput = document.getElementById('storeIdInput');
         document.getElementById('btnOpenSync').onclick = () => { storeIdInput.value = currentStoreId; syncModal.classList.remove('hidden'); };
@@ -459,7 +492,6 @@
             } else syncModal.classList.add('hidden');
         };
 
-        // UI 渲染
         function updateUI() {
             let totalNet = 0, totalRev = 0, totalRent = 0;
             records.forEach(r => { totalNet += r.net; totalRev += r.revenue; totalRent += r.rent; });
