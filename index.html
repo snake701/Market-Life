@@ -47,7 +47,7 @@
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.4.1</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.4.2</span>
                 </h1>
                 <p class="text-indigo-200 text-xs flex items-center gap-1" id="userStatus">
                     <i class="fas fa-circle-notch fa-spin"></i> 正在連線...
@@ -210,10 +210,10 @@
                 </div>
 
                 <!-- 診斷資訊 -->
-                <div class="mb-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 border border-gray-200">
-                    <p class="font-bold mb-1">連線診斷資訊：</p>
-                    <p>連線專案 ID: <span id="debugProjectId" class="font-mono text-indigo-600 select-all">checking...</span></p>
-                    <p class="mt-1 text-[10px] text-gray-400">* 手機與電腦的 ID 必須相同才能同步</p>
+                <div class="mb-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 border border-gray-200 break-all">
+                    <p class="font-bold mb-1 text-gray-700">連線診斷 (請檢查)：</p>
+                    <p>目前連線專案 ID: <span id="debugProjectId" class="font-mono text-indigo-600 font-bold bg-indigo-50 px-1 rounded">偵測中...</span></p>
+                    <p class="mt-1 text-[10px] text-gray-400">若顯示的 ID 不是 market-life-309fe，代表還在預覽環境</p>
                 </div>
 
                 <div class="flex gap-3">
@@ -232,7 +232,7 @@
         import { getFirestore, collection, addDoc, deleteDoc, onSnapshot, query, orderBy, doc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ==========================================
-        // 1. 強制使用您的設定，移除所有自動切換邏輯
+        // 1. 強制設定 (移除所有環境判斷，這是關鍵)
         // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyAtj6uPha5PNX4_c2EIyF-NQ2G8Jshv75g",
@@ -258,12 +258,13 @@
         // 初始化 APP
         function initApp() {
             try {
+                // 強制使用上面的 config，不做任何判斷
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
 
                 // 更新診斷資訊
-                document.getElementById('debugProjectId').innerText = firebaseConfig.projectId;
+                document.getElementById('debugProjectId').innerText = app.options.projectId;
 
                 onAuthStateChanged(auth, (currentUser) => {
                     if (currentUser) {
@@ -292,6 +293,7 @@
 
         // 取得路徑 - 統一使用 Stores 結構
         function getCollectionRef() {
+            // 只使用單一路徑，不分環境
             return collection(db, 'stores', currentStoreId, 'records');
         }
 
