@@ -29,7 +29,7 @@
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.3</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.4</span>
                 </h1>
                 <p class="text-indigo-200 text-xs flex items-center gap-1" id="userStatus">
                     <i class="fas fa-circle-notch fa-spin"></i> 正在連線雲端...
@@ -315,7 +315,16 @@
                 console.error("讀取資料錯誤:", error);
                 if (error.code === 'permission-denied') {
                     document.getElementById('userStatus').innerHTML = `<i class="fas fa-lock text-red-300"></i> 權限不足`;
-                    // 不彈出 alert 避免干擾，但顯示在狀態列
+                    alert("【權限不足】\n請檢查 Firestore Rules 是否已設為測試模式 (allow read, write: if true;)");
+                } else if (error.code === 'failed-precondition') {
+                     // 可能是因為 query 需要 index，但在這個簡單的 app 中較少見
+                } else {
+                     // 其他讀取錯誤，通常是網路或資料庫未建立
+                     console.log("Firestore error code:", error.code);
+                     if(error.message && error.message.includes("The project")) {
+                         document.getElementById('userStatus').innerHTML = `<i class="fas fa-database text-red-300"></i> 資料庫未建立`;
+                         alert("【資料庫未建立】\n請到 Firebase Console > Firestore Database 點擊「建立資料庫」。");
+                     }
                 }
             });
         }
@@ -349,9 +358,9 @@
 
                 const collectionRef = getCollectionRef();
                 
-                // 加入 10 秒超時機制，避免網路不通時按鈕卡死
+                // 縮短為 5 秒超時機制，加快除錯速度
                 const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error("timeout")), 10000)
+                    setTimeout(() => reject(new Error("timeout")), 5000)
                 );
 
                 await Promise.race([
@@ -376,7 +385,7 @@
                 
                 let errorMsg = "新增失敗，請稍後再試。";
                 if (error.message === 'timeout') {
-                    errorMsg = "連線回應逾時。\n這通常代表您的網頁無法連接到 Firebase 資料庫。\n\n請檢查：\n1. 網路是否正常？\n2. Firebase Console 是否已建立「Firestore Database」？\n3. Firestore 規則是否允許讀寫？(測試模式)";
+                    errorMsg = "連線回應逾時 (超過5秒)。\n\n這極有可能是因為「Firestore Database」尚未建立！\n\n請依照以下步驟解決：\n1. 進入 Firebase Console\n2. 點擊 Build > Firestore Database\n3. 點擊「Create Database」\n4. 選擇「Start in test mode」(測試模式)";
                 } else if (error.code === 'permission-denied') {
                     errorMsg = "權限不足 (Permission Denied)。\n\n請到 Firebase Console > Firestore Database > Rules\n確認規則是否設定正確 (測試時可設為 allow read, write: if true;)";
                 } else if (error.code === 'unavailable') {
@@ -639,25 +648,5 @@
     </script>
 </body>
 </html>
-```
 
-### 診斷步驟
 
-請在更新程式碼後，重新整理網頁，觀察標題下方的狀態文字：
-
-1.  **如果顯示「連線失敗：未開啟匿名登入」**
-    * 請到 Firebase Console -> **Authentication** -> Sign-in method。
-    * 確保 **Anonymous** 狀態為 **Enabled**。
-
-2.  **如果顯示「權限不足」或「連線逾時」**
-    * 請到 Firebase Console -> **Firestore Database** -> Rules。
-    * 將規則改為測試模式：
-        ```
-        rules_version = '2';
-        service cloud.firestore {
-          match /databases/{database}/documents {
-            match /{document=**} {
-              allow read, write: if true;
-            }
-          }
-        }
