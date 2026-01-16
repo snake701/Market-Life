@@ -17,7 +17,7 @@
             width: 100%;
             height: 100%;
             overflow-x: hidden; /* 禁止左右滑動 */
-            position: fixed; /* 固定頁面，防止鍵盤彈出時推擠背景 */
+            position: fixed; /* 固定頁面 */
             top: 0;
             left: 0;
             overscroll-behavior: none; /* 禁止彈性滾動 */
@@ -25,12 +25,8 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
         }
 
-        /* 修正數字輸入框 */
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { 
-            -webkit-appearance: none; margin: 0; 
-        }
-
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
         /* 修正 iOS 日期輸入框高度 */
         input[type="date"] {
             -webkit-appearance: none;
@@ -38,15 +34,12 @@
             min-height: 2.75rem;
         }
 
-        /* 隱藏滾動條但保留功能 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 flex flex-col">
 
-    <!-- App Container -->
-    <!-- 使用 w-full, h-full 確保填滿，並使用 overflow-y-auto 處理內部滾動 -->
     <div class="w-full h-full max-w-md mx-auto bg-white flex flex-col shadow-2xl relative overflow-hidden">
 
         <!-- Header -->
@@ -54,10 +47,10 @@
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.9</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.4.0</span>
                 </h1>
                 <p class="text-indigo-200 text-xs flex items-center gap-1" id="userStatus">
-                    <i class="fas fa-circle-notch fa-spin"></i> 正在連線雲端...
+                    <i class="fas fa-circle-notch fa-spin"></i> 正在連線...
                 </p>
             </div>
             <div class="flex gap-3">
@@ -70,7 +63,6 @@
             </div>
         </header>
 
-        <!-- Main Content: 設定 overflow-y-auto 讓滾動發生在這裡，而不是 body -->
         <main class="flex-1 overflow-y-auto pb-24 bg-gray-50 no-scrollbar relative" id="mainView">
             
             <!-- Dashboard -->
@@ -229,14 +221,11 @@
 
     <!-- Firebase Logic (Module Type) -->
     <script type="module">
-        // 匯入 Firebase SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, onSnapshot, query, orderBy, doc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ==========================================
-        // Firebase 設定
-        // ==========================================
+        // 使用者提供的配置
         const userFirebaseConfig = {
             apiKey: "AIzaSyAtj6uPha5PNX4_c2EIyF-NQ2G8Jshv75g",
             authDomain: "market-life-309fe.firebaseapp.com",
@@ -246,41 +235,22 @@
             appId: "1:143823003012:web:fd53ef47c12aab9317d1d1"
         };
 
-        // 系統邏輯
-        let firebaseConfig;
-        let appId = 'default';
-        let isCanvasEnvironment = false;
-
-        if (typeof __firebase_config !== 'undefined') {
-            firebaseConfig = JSON.parse(__firebase_config);
-            if(typeof __app_id !== 'undefined') appId = __app_id;
-            isCanvasEnvironment = true;
-        } else {
-            firebaseConfig = userFirebaseConfig;
-        }
-
-        // 初始化變數
+        let firebaseConfig = userFirebaseConfig; // 強制使用使用者配置
         let app, auth, db, user;
         let records = [];
-        let unsubscribe = null; // 用於切換商店時取消監聽
+        let unsubscribe = null; 
 
-        // 管理 Store ID
-        // 優先從 localStorage 讀取，若無則產生隨機 ID
+        // 初始化商店代碼
         let currentStoreId = localStorage.getItem('vendor_store_id');
         if (!currentStoreId) {
             currentStoreId = 'store_' + Math.random().toString(36).substr(2, 6).toUpperCase();
             localStorage.setItem('vendor_store_id', currentStoreId);
         }
 
-        // 啟動 Firebase
+        // 初始化 APP
         function initApp() {
-            if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                document.getElementById('userStatus').innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-300"></i> 設定錯誤';
-                alert("請先設定 Firebase Config");
-                return;
-            }
-
             try {
+                // 強制使用使用者的 config 初始化
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
@@ -298,9 +268,7 @@
                             let errorMsg = "連線失敗";
                             if(error.code === 'auth/operation-not-allowed') {
                                 errorMsg = "未開啟匿名登入";
-                                alert("【連線失敗】\n請到 Firebase Console > Authentication > Sign-in method\n開啟「Anonymous (匿名)」登入功能。");
-                            } else if (error.code === 'auth/network-request-failed') {
-                                errorMsg = "網路錯誤";
+                                alert("請至 Firebase Console 開啟匿名登入！");
                             }
                             document.getElementById('userStatus').innerHTML = `<i class="fas fa-times-circle text-red-300"></i> ${errorMsg}`;
                         });
@@ -308,60 +276,45 @@
                 });
             } catch (e) {
                 console.error("初始化錯誤:", e);
-                document.getElementById('userStatus').innerHTML = '<i class="fas fa-times-circle text-red-300"></i> 初始化錯誤';
+                document.getElementById('userStatus').innerHTML = '<i class="fas fa-times-circle text-red-300"></i> 設定錯誤';
             }
         }
 
-        // 取得資料庫路徑 (關鍵邏輯)
+        // 取得路徑 (修正重點：移除 Canvas 判斷，統一使用 stores 路徑)
         function getCollectionRef() {
-            if (isCanvasEnvironment) {
-                // Canvas 預覽環境：強制使用 User ID (遵守平台規則)
-                return collection(db, 'artifacts', appId, 'users', user.uid, 'records');
-            } else {
-                // 用戶正式環境：使用 Shared Store ID 實現同步
-                // 路徑結構: stores/{storeId}/records
-                return collection(db, 'stores', currentStoreId, 'records');
-            }
+            // 無論在哪裡執行，都使用 stores/{storeId}/records 結構
+            // 這樣才能實現跨裝置同步
+            return collection(db, 'stores', currentStoreId, 'records');
         }
 
-        // 監聽 Firestore 資料
         function startListeningData() {
             if (!user) return;
-            
-            // 如果之前有監聽，先取消
-            if (unsubscribe) {
-                unsubscribe();
-            }
+            if (unsubscribe) unsubscribe();
 
             const collectionRef = getCollectionRef();
             const q = query(collectionRef, orderBy('date', 'desc'));
 
-            // 開始監聽並保存 unsubscribe function
             unsubscribe = onSnapshot(q, (snapshot) => {
                 records = snapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
                 }));
                 updateUI();
-                applyFilters(); // 資料更新時也重新應用篩選
+                applyFilters(); 
             }, (error) => {
-                console.error("讀取資料錯誤:", error);
+                console.error("讀取錯誤:", error);
                 if (error.code === 'permission-denied') {
                     document.getElementById('userStatus').innerHTML = `<i class="fas fa-lock text-red-300"></i> 權限不足`;
-                    // 不彈出 alert 避免干擾，但顯示在狀態列
                 }
             });
         }
 
-        // 新增資料
         async function addRecord(e) {
             e.preventDefault();
-            if (!user) { alert("尚未連線，請檢查網路或 Firebase 設定"); return; }
+            if (!user) { alert("尚未連線"); return; }
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
-            // 避免重複點擊時抓到 "處理中..." 的文字，固定設定回原始樣式
             const originalHTML = '<i class="fas fa-cloud-upload-alt"></i> 儲存到雲端';
-            
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
 
@@ -377,22 +330,14 @@
                 const newRecord = {
                     date, venue, organizer, sales, revenue, rent, net,
                     createdAt: Timestamp.now(),
-                    createdBy: user.uid // 紀錄是誰建的
+                    createdBy: user.uid
                 };
 
                 const collectionRef = getCollectionRef();
                 
-                // 縮短為 5 秒超時機制，加快除錯速度
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error("timeout")), 5000)
-                );
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000));
+                await Promise.race([addDoc(collectionRef, newRecord), timeoutPromise]);
 
-                await Promise.race([
-                    addDoc(collectionRef, newRecord),
-                    timeoutPromise
-                ]);
-
-                // Reset Form
                 document.getElementById('salesInput').value = '';
                 document.getElementById('revenueInput').value = '';
                 document.getElementById('rentInput').value = '';
@@ -402,61 +347,44 @@
                 document.getElementById('calculatedNet').className = "text-xl font-black text-gray-400";
                 
                 if (navigator.vibrate) navigator.vibrate(50);
-                alert("新增成功！"); // 明確回饋
+                alert("新增成功！");
 
             } catch (error) {
                 console.error("新增失敗:", error);
-                
-                let errorMsg = "新增失敗，請稍後再試。";
-                if (error.message === 'timeout') {
-                    errorMsg = "連線回應逾時 (超過5秒)。\n\n這極有可能是因為「Firestore Database」尚未建立！\n\n請依照以下步驟解決：\n1. 進入 Firebase Console\n2. 點擊 Build > Firestore Database\n3. 點擊「Create Database」\n4. 選擇「Start in test mode」(測試模式)";
-                } else if (error.code === 'permission-denied') {
-                    errorMsg = "權限不足 (Permission Denied)。\n\n請到 Firebase Console > Firestore Database > Rules\n確認規則是否設定正確 (測試時可設為 allow read, write: if true;)";
-                } else if (error.code === 'unavailable') {
-                    errorMsg = "服務無法使用 (Client Offline)。\n請檢查您的網路連線。";
-                }
-
-                alert(errorMsg);
+                let msg = "新增失敗";
+                if (error.message === 'timeout') msg = "連線逾時，請檢查資料庫是否已建立";
+                else if (error.code === 'permission-denied') msg = "權限不足，請檢查 Firestore Rules";
+                alert(msg);
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalHTML;
             }
         }
 
-        // 刪除資料
         window.deleteRecord = async function(docId) {
-            if(!confirm("確定要刪除這筆紀錄嗎？")) return;
+            if(!confirm("確定要刪除？")) return;
             try {
-                // 必須重新建構 doc reference，因為 docId 來自列表
-                let docRef;
-                if (isCanvasEnvironment) {
-                    docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'records', docId);
-                } else {
-                    docRef = doc(db, 'stores', currentStoreId, 'records', docId);
-                }
+                const docRef = doc(db, 'stores', currentStoreId, 'records', docId);
                 await deleteDoc(docRef);
             } catch (error) {
                 console.error("刪除失敗:", error);
-                alert("刪除失敗: " + error.message);
+                alert("刪除失敗");
             }
         };
 
-        // 匯入 Excel
+        // 匯入 Excel 邏輯 (略，與前版相同)
         async function handleImport(input) {
             const file = input.files[0];
             if (!file) return;
-            if(!confirm("確定要將 Excel 資料匯入此商店嗎？")) { input.value = ''; return; }
-
+            if(!confirm("確定匯入？")) { input.value = ''; return; }
             const reader = new FileReader();
             reader.onload = async function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, {type: 'array'});
                     const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                    
-                    let count = 0;
                     const collectionRef = getCollectionRef();
-
+                    let count = 0;
                     for (const row of jsonData) {
                         if(row['日期'] && row['場地']) {
                             await addDoc(collectionRef, {
@@ -473,193 +401,112 @@
                             count++;
                         }
                     }
-                    alert(`成功匯入 ${count} 筆資料！`);
-                } catch (error) {
-                    console.error(error);
-                    alert("匯入失敗");
-                }
+                    alert(`匯入 ${count} 筆成功`);
+                } catch (e) { alert("匯入失敗"); }
                 input.value = '';
             };
             reader.readAsArrayBuffer(file);
         }
 
-        // ================= Filter Logic =================
+        // 篩選功能
         const filterMonth = document.getElementById('filterMonth');
         const filterVenue = document.getElementById('filterVenue');
         const btnClearFilter = document.getElementById('btnClearFilter');
 
-        // 監聽篩選變更
+        function applyFilters() {
+            let filtered = [...records];
+            if (filterMonth.value) filtered = filtered.filter(r => r.date.startsWith(filterMonth.value));
+            if (filterVenue.value) {
+                const v = filterVenue.value.toLowerCase();
+                filtered = filtered.filter(r => (r.venue && r.venue.toLowerCase().includes(v)) || (r.organizer && r.organizer.toLowerCase().includes(v)));
+            }
+            renderList('fullHistoryList', filtered);
+        }
+
         filterMonth.addEventListener('change', applyFilters);
         filterVenue.addEventListener('input', () => {
-            if(filterVenue.value) btnClearFilter.classList.remove('hidden');
-            else btnClearFilter.classList.add('hidden');
+            btnClearFilter.classList.toggle('hidden', !filterVenue.value);
             applyFilters();
         });
-        
-        // 清除場地搜尋
-        btnClearFilter.addEventListener('click', () => {
-            filterVenue.value = '';
-            btnClearFilter.classList.add('hidden');
-            applyFilters();
-        });
+        btnClearFilter.onclick = () => { filterVenue.value = ''; btnClearFilter.classList.add('hidden'); applyFilters(); };
 
-        function applyFilters() {
-            let filteredRecords = [...records];
-            
-            // 1. 月份篩選 (格式: YYYY-MM)
-            const monthVal = filterMonth.value;
-            if (monthVal) {
-                filteredRecords = filteredRecords.filter(r => r.date.startsWith(monthVal));
-            }
-
-            // 2. 場地/主辦單位搜尋
-            const venueVal = filterVenue.value.trim().toLowerCase();
-            if (venueVal) {
-                filteredRecords = filteredRecords.filter(r => 
-                    (r.venue && r.venue.toLowerCase().includes(venueVal)) || 
-                    (r.organizer && r.organizer.toLowerCase().includes(venueVal))
-                );
-            }
-
-            renderList('fullHistoryList', filteredRecords);
-        }
-
-        // ================= Sync Logic =================
-        
+        // 同步功能
         const syncModal = document.getElementById('syncModal');
         const storeIdInput = document.getElementById('storeIdInput');
-
-        // 打開同步視窗
-        document.getElementById('btnOpenSync').onclick = () => {
-            storeIdInput.value = currentStoreId;
-            syncModal.classList.remove('hidden');
-        };
-
-        // 關閉同步視窗
-        document.getElementById('btnCancelSync').onclick = () => {
-            syncModal.classList.add('hidden');
-        };
-
-        // 儲存新的 Store ID
+        document.getElementById('btnOpenSync').onclick = () => { storeIdInput.value = currentStoreId; syncModal.classList.remove('hidden'); };
+        document.getElementById('btnCancelSync').onclick = () => syncModal.classList.add('hidden');
         document.getElementById('btnSaveSync').onclick = () => {
             const newId = storeIdInput.value.trim();
-            if (!newId) { alert("代碼不能為空"); return; }
-            
+            if (!newId) return alert("代碼不能為空");
             if (newId !== currentStoreId) {
-                if(confirm("切換代碼後，目前的畫面將會重新整理以載入新代碼的資料，確定嗎？")) {
+                if(confirm("確定切換商店代碼？")) {
                     currentStoreId = newId;
                     localStorage.setItem('vendor_store_id', currentStoreId);
-                    
-                    // 更新 UI 狀態
-                    const shortId = currentStoreId.length > 8 ? currentStoreId.slice(0, 8) + '...' : currentStoreId;
-                    document.getElementById('userStatus').innerHTML = `<i class="fas fa-check-circle text-green-300"></i> 已連線 (商店: ${shortId})`;
+                    document.getElementById('userStatus').innerText = `已連線 (商店: ${currentStoreId})`;
                     syncModal.classList.add('hidden');
-                    
-                    // 重新啟動監聽 (載入新資料)
                     startListeningData();
                 }
-            } else {
-                syncModal.classList.add('hidden');
-            }
+            } else syncModal.classList.add('hidden');
         };
 
-        // ================= UI Logic =================
-
+        // UI 渲染
         function updateUI() {
-            let totalNet = 0, totalRevenue = 0, totalRent = 0;
-            records.forEach(r => {
-                totalNet += r.net;
-                totalRevenue += r.revenue;
-                totalRent += r.rent;
-            });
-
+            let totalNet = 0, totalRev = 0, totalRent = 0;
+            records.forEach(r => { totalNet += r.net; totalRev += r.revenue; totalRent += r.rent; });
             document.getElementById('dashboardNet').innerText = `$${totalNet.toLocaleString()}`;
-            document.getElementById('dashboardRevenue').innerText = `$${totalRevenue.toLocaleString()}`;
+            document.getElementById('dashboardRevenue').innerText = `$${totalRev.toLocaleString()}`;
             document.getElementById('dashboardRent').innerText = `-$${totalRent.toLocaleString()}`;
             document.getElementById('totalEventsBadge').innerText = `${records.length} 場`;
-
             renderList('recentList', records.slice(0, 3));
-            // fullHistoryList 由 applyFilters 更新，避免覆蓋篩選結果
-            applyFilters(); 
+            applyFilters();
         }
 
-        function renderList(elementId, data) {
-            const container = document.getElementById(elementId);
-            if (data.length === 0) {
-                if (elementId === 'fullHistoryList' && records.length > 0) {
-                    container.innerHTML = `<div class="text-center py-8 text-gray-400 text-sm flex flex-col items-center"><i class="fas fa-search text-3xl mb-2 opacity-30"></i>沒有符合篩選的紀錄</div>`;
-                } else {
-                    container.innerHTML = `<div class="text-center py-8 text-gray-400 text-sm flex flex-col items-center"><i class="fas fa-cloud text-3xl mb-2 opacity-30"></i>雲端尚無紀錄</div>`;
-                }
+        function renderList(id, data) {
+            const el = document.getElementById(id);
+            if (!data.length) {
+                el.innerHTML = `<div class="text-center py-8 text-gray-400 text-sm flex flex-col items-center"><i class="fas fa-cloud text-3xl mb-2 opacity-30"></i>無資料</div>`;
                 return;
             }
-
-            let html = '';
-            data.forEach(r => {
-                const isPositive = r.net >= 0;
-                const netColorClass = isPositive ? 'text-green-600' : 'text-red-500';
-                const organizerHtml = r.organizer ? `<div class="text-xs text-indigo-500 mb-0.5"><i class="fas fa-user-tag mr-1 text-[10px]"></i>${r.organizer}</div>` : '';
-                
-                let dateDisplay = r.date;
-                try {
-                    const d = new Date(r.date);
-                    dateDisplay = `${d.getMonth() + 1}/${d.getDate()}`;
-                } catch(e){}
-
-                html += `
+            el.innerHTML = data.map(r => {
+                const color = r.net >= 0 ? 'text-green-600' : 'text-red-500';
+                const dateStr = new Date(r.date).toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'});
+                const org = r.organizer ? `<div class="text-xs text-indigo-500 mb-0.5"><i class="fas fa-user-tag mr-1 text-[10px]"></i>${r.organizer}</div>` : '';
+                return `
                 <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center relative group">
-                    <button onclick="deleteRecord('${r.id}')" class="absolute right-2 top-2 text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition z-10">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
+                    <button onclick="deleteRecord('${r.id}')" class="absolute right-2 top-2 text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition z-10"><i class="fas fa-trash-alt"></i></button>
                     <div class="flex items-center gap-3">
-                        <div class="bg-gray-100 text-gray-600 font-bold rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs leading-tight">
-                            <span>${dateDisplay}</span>
-                        </div>
+                        <div class="bg-gray-100 text-gray-600 font-bold rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs leading-tight"><span>${dateStr}</span></div>
                         <div>
                             <div class="font-bold text-gray-800 text-sm">${r.venue}</div>
-                            ${organizerHtml}
-                            <div class="text-xs text-gray-400 mt-0.5">
-                                營收 ${r.revenue} | 租金 -${r.rent}
-                            </div>
+                            ${org}
+                            <div class="text-xs text-gray-400 mt-0.5">營收 ${r.revenue} | 租金 -${r.rent}</div>
                         </div>
                     </div>
                     <div class="text-right">
                         <div class="text-xs text-gray-400 mb-0.5">實收</div>
-                        <div class="font-bold text-lg ${netColorClass}">${isPositive?'+':''}${r.net.toLocaleString()}</div>
+                        <div class="font-bold text-lg ${color}">${r.net >= 0 ? '+' : ''}${r.net.toLocaleString()}</div>
                     </div>
                 </div>`;
-            });
-            container.innerHTML = html;
+            }).join('');
         }
-        
-        // Window Load
-        window.onload = function() {
-            document.getElementById('dateInput').valueAsDate = new Date();
-            initApp();
-        };
 
-        // UI Event Bindings
         window.calculateNet = function() {
-            const revenue = parseInt(document.getElementById('revenueInput').value) || 0;
+            const rev = parseInt(document.getElementById('revenueInput').value) || 0;
             const rent = parseInt(document.getElementById('rentInput').value) || 0;
-            const net = revenue - rent;
-            const display = document.getElementById('calculatedNet');
-            display.innerText = `$${net.toLocaleString()}`;
-            if (net > 0) display.className = "text-xl font-black text-green-600";
-            else if (net < 0) display.className = "text-xl font-black text-red-500";
-            else display.className = "text-xl font-black text-gray-400";
+            const net = rev - rent;
+            const el = document.getElementById('calculatedNet');
+            el.innerText = `$${net.toLocaleString()}`;
+            el.className = `text-xl font-black ${net > 0 ? 'text-green-600' : net < 0 ? 'text-red-500' : 'text-gray-400'}`;
         };
 
+        window.onload = () => { document.getElementById('dateInput').valueAsDate = new Date(); initApp(); };
         document.getElementById('entryForm').onsubmit = addRecord;
-        document.getElementById('btnExport').onclick = function() {
-            if (records.length === 0) { alert("沒有資料"); return; }
-            const data = [["日期", "場地", "主辦單位", "目標業績", "營收", "租金", "實收"]];
-            // 這裡修正：匯出時應考慮篩選後的資料，或者詢問用戶。目前維持匯出全部資料。
-            records.forEach(r => data.push([r.date, r.venue, r.organizer||'', r.sales, r.revenue, r.rent, r.net]));
-            const ws = XLSX.utils.aoa_to_sheet(data);
+        document.getElementById('btnExport').onclick = () => {
+            if(!records.length) return alert("無資料");
+            const data = [["日期", "場地", "主辦單位", "目標業績", "營收", "租金", "實收"], ...records.map(r => [r.date, r.venue, r.organizer, r.sales, r.revenue, r.rent, r.net])];
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "擺攤紀錄");
-            XLSX.writeFile(wb, `擺攤紀錄_商店${currentStoreId}_${new Date().toISOString().slice(0,10)}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), "紀錄");
+            XLSX.writeFile(wb, `擺攤紀錄_${currentStoreId}.xlsx`);
         };
         document.getElementById('btnImport').onclick = () => document.getElementById('importFile').click();
         document.getElementById('importFile').onchange = (e) => handleImport(e.target);
@@ -668,7 +515,6 @@
         document.getElementById('btnToggleHistory').onclick = toggleHistory;
         document.getElementById('btnViewAll').onclick = toggleHistory;
         document.getElementById('btnCloseHistory').onclick = toggleHistory;
-
     </script>
 </body>
 </html>
