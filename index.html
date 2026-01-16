@@ -29,9 +29,11 @@
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.2</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.3</span>
                 </h1>
-                <p class="text-indigo-200 text-xs" id="userStatus">正在連線雲端...</p>
+                <p class="text-indigo-200 text-xs flex items-center gap-1" id="userStatus">
+                    <i class="fas fa-circle-notch fa-spin"></i> 正在連線雲端...
+                </p>
             </div>
             <div class="flex gap-3">
                 <!-- 同步按鈕 -->
@@ -240,27 +242,41 @@
         // 啟動 Firebase
         function initApp() {
             if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
+                document.getElementById('userStatus').innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-300"></i> 設定錯誤';
                 alert("請先設定 Firebase Config");
                 return;
             }
 
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
 
-            onAuthStateChanged(auth, (currentUser) => {
-                if (currentUser) {
-                    user = currentUser;
-                    document.getElementById('userStatus').innerText = `已連線 (商店: ${currentStoreId})`;
-                    startListeningData(); 
-                } else {
-                    document.getElementById('userStatus').innerText = "連線中...";
-                    signInAnonymously(auth).catch((error) => {
-                        console.error("登入失敗:", error);
-                        document.getElementById('userStatus').innerText = "連線失敗";
-                    });
-                }
-            });
+                onAuthStateChanged(auth, (currentUser) => {
+                    if (currentUser) {
+                        user = currentUser;
+                        const shortId = currentStoreId.length > 8 ? currentStoreId.slice(0, 8) + '...' : currentStoreId;
+                        document.getElementById('userStatus').innerHTML = `<i class="fas fa-check-circle text-green-300"></i> 已連線 (商店: ${shortId})`;
+                        startListeningData(); 
+                    } else {
+                        document.getElementById('userStatus').innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> 登入中...';
+                        signInAnonymously(auth).catch((error) => {
+                            console.error("登入失敗:", error);
+                            let errorMsg = "連線失敗";
+                            if(error.code === 'auth/operation-not-allowed') {
+                                errorMsg = "未開啟匿名登入";
+                                alert("【連線失敗】\n請到 Firebase Console > Authentication > Sign-in method\n開啟「Anonymous (匿名)」登入功能。");
+                            } else if (error.code === 'auth/network-request-failed') {
+                                errorMsg = "網路錯誤";
+                            }
+                            document.getElementById('userStatus').innerHTML = `<i class="fas fa-times-circle text-red-300"></i> ${errorMsg}`;
+                        });
+                    }
+                });
+            } catch (e) {
+                console.error("初始化錯誤:", e);
+                document.getElementById('userStatus').innerHTML = '<i class="fas fa-times-circle text-red-300"></i> 初始化錯誤';
+            }
         }
 
         // 取得資料庫路徑 (關鍵邏輯)
@@ -297,14 +313,17 @@
                 applyFilters(); // 資料更新時也重新應用篩選
             }, (error) => {
                 console.error("讀取資料錯誤:", error);
-                // 若權限不足可能是規則沒開，或路徑問題
+                if (error.code === 'permission-denied') {
+                    document.getElementById('userStatus').innerHTML = `<i class="fas fa-lock text-red-300"></i> 權限不足`;
+                    // 不彈出 alert 避免干擾，但顯示在狀態列
+                }
             });
         }
 
         // 新增資料
         async function addRecord(e) {
             e.preventDefault();
-            if (!user) { alert("尚未連線"); return; }
+            if (!user) { alert("尚未連線，請檢查網路或 Firebase 設定"); return; }
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
             // 避免重複點擊時抓到 "處理中..." 的文字，固定設定回原始樣式
@@ -332,7 +351,7 @@
                 
                 // 加入 10 秒超時機制，避免網路不通時按鈕卡死
                 const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error("連線回應逾時，請檢查網路狀況")), 10000)
+                    setTimeout(() => reject(new Error("timeout")), 10000)
                 );
 
                 await Promise.race([
@@ -350,10 +369,21 @@
                 document.getElementById('calculatedNet').className = "text-xl font-black text-gray-400";
                 
                 if (navigator.vibrate) navigator.vibrate(50);
+                alert("新增成功！"); // 明確回饋
 
             } catch (error) {
                 console.error("新增失敗:", error);
-                alert("新增失敗: " + error.message + "\n(若是權限錯誤，請確認 Firebase 後台是否已開啟 Firestore Database)");
+                
+                let errorMsg = "新增失敗，請稍後再試。";
+                if (error.message === 'timeout') {
+                    errorMsg = "連線回應逾時。\n這通常代表您的網頁無法連接到 Firebase 資料庫。\n\n請檢查：\n1. 網路是否正常？\n2. Firebase Console 是否已建立「Firestore Database」？\n3. Firestore 規則是否允許讀寫？(測試模式)";
+                } else if (error.code === 'permission-denied') {
+                    errorMsg = "權限不足 (Permission Denied)。\n\n請到 Firebase Console > Firestore Database > Rules\n確認規則是否設定正確 (測試時可設為 allow read, write: if true;)";
+                } else if (error.code === 'unavailable') {
+                    errorMsg = "服務無法使用 (Client Offline)。\n請檢查您的網路連線。";
+                }
+
+                alert(errorMsg);
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalHTML;
@@ -374,7 +404,7 @@
                 await deleteDoc(docRef);
             } catch (error) {
                 console.error("刪除失敗:", error);
-                alert("刪除失敗");
+                alert("刪除失敗: " + error.message);
             }
         };
 
@@ -488,7 +518,8 @@
                     localStorage.setItem('vendor_store_id', currentStoreId);
                     
                     // 更新 UI 狀態
-                    document.getElementById('userStatus').innerText = `已連線 (商店: ${currentStoreId})`;
+                    const shortId = currentStoreId.length > 8 ? currentStoreId.slice(0, 8) + '...' : currentStoreId;
+                    document.getElementById('userStatus').innerHTML = `<i class="fas fa-check-circle text-green-300"></i> 已連線 (商店: ${shortId})`;
                     syncModal.classList.add('hidden');
                     
                     // 重新啟動監聽 (載入新資料)
@@ -608,3 +639,25 @@
     </script>
 </body>
 </html>
+```
+
+### 診斷步驟
+
+請在更新程式碼後，重新整理網頁，觀察標題下方的狀態文字：
+
+1.  **如果顯示「連線失敗：未開啟匿名登入」**
+    * 請到 Firebase Console -> **Authentication** -> Sign-in method。
+    * 確保 **Anonymous** 狀態為 **Enabled**。
+
+2.  **如果顯示「權限不足」或「連線逾時」**
+    * 請到 Firebase Console -> **Firestore Database** -> Rules。
+    * 將規則改為測試模式：
+        ```
+        rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+            match /{document=**} {
+              allow read, write: if true;
+            }
+          }
+        }
