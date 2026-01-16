@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>擺攤記帳小幫手</title>
+    <!-- 引入 Tailwind CSS 進行快速切版與美化 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 FontAwesome 圖示 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* 針對手機優化的細節調整 */
+        body {
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+        }
+        /* 隱藏數字輸入框的上下箭頭 */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 h-screen overflow-hidden flex flex-col">
+
+    <!-- App Container: 限制最大寬度，讓電腦版看起來也像 App -->
+    <div class="w-full max-w-md mx-auto bg-white h-full flex flex-col shadow-2xl relative">
+
+        <!-- Header: 頂部導航與標題 -->
+        <header class="bg-indigo-600 text-white p-4 pt-8 flex justify-between items-center shadow-md z-10">
+            <div>
+                <h1 class="text-xl font-bold"><i class="fas fa-store mr-2"></i>擺攤記帳</h1>
+                <p class="text-indigo-200 text-xs">輕鬆記錄每一場市集</p>
+            </div>
+            <button onclick="toggleHistoryView()" class="text-white hover:text-indigo-200 transition">
+                <i class="fas fa-list-ul text-xl"></i>
+            </button>
+        </header>
+
+        <!-- Main Content: 主要滾動區域 -->
+        <main class="flex-1 overflow-y-auto pb-24 bg-gray-50" id="mainView">
+            
+            <!-- Dashboard Card: 儀表板 -->
+            <div class="p-4">
+                <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg transform transition hover:scale-[1.01]">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-indigo-100 text-sm font-medium">本月總實收 (Net)</span>
+                        <span class="bg-white/20 px-2 py-1 rounded text-xs" id="totalEventsBadge">0 場</span>
+                    </div>
+                    <div class="text-4xl font-bold mb-1 tracking-tight" id="dashboardNet">$0</div>
+                    <div class="flex gap-4 text-xs text-indigo-100 mt-4">
+                        <div>
+                            <span class="block opacity-70">總營收</span>
+                            <span class="font-semibold text-white" id="dashboardRevenue">$0</span>
+                        </div>
+                        <div>
+                            <span class="block opacity-70">總租金</span>
+                            <span class="font-semibold text-white" id="dashboardRent">$0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Form: 輸入表單 -->
+            <div class="px-4 pb-4">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <h2 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4 border-b pb-2">新增今日紀錄</h2>
+                    
+                    <form id="entryForm" class="space-y-4">
+                        <!-- 第一行：日期與場地 -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">日期</label>
+                                <input type="date" id="dateInput" required 
+                                    class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">場地</label>
+                                <select id="venueInput" 
+                                    class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition appearance-none">
+                                    <option value="中山市集">中山市集</option>
+                                    <option value="信義商圈">信義商圈</option>
+                                    <option value="華山文創">華山文創</option>
+                                    <option value="松菸誠品">松菸誠品</option>
+                                    <option value="西門紅樓">西門紅樓</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 第二行：業績 (僅紀錄用) -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">目標業績 / 銷售額</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2 text-gray-400 text-sm">$</span>
+                                <input type="number" id="salesInput" placeholder="0" inputmode="numeric"
+                                    class="w-full bg-gray-50 border border-gray-200 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- 第三行：營收與租金 -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1 text-green-600">實際營收 (+)</label>
+                                <div class="relative">
+                                    <input type="number" id="revenueInput" placeholder="0" inputmode="numeric" oninput="calculateNet()" required
+                                        class="w-full bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-700 font-bold focus:outline-none focus:ring-2 focus:ring-green-500 transition text-right">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1 text-red-500">攤位租金 (-)</label>
+                                <div class="relative">
+                                    <input type="number" id="rentInput" placeholder="0" inputmode="numeric" oninput="calculateNet()" required
+                                        class="w-full bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700 font-bold focus:outline-none focus:ring-2 focus:ring-red-500 transition text-right">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 結果：自動計算實收 -->
+                        <div class="pt-2">
+                            <div class="flex justify-between items-end bg-gray-100 rounded-lg p-3">
+                                <span class="text-xs font-bold text-gray-500">本日實收 Net Income</span>
+                                <span id="calculatedNet" class="text-xl font-black text-gray-400">$0</span>
+                            </div>
+                        </div>
+
+                        <!-- 按鈕 -->
+                        <button type="submit" 
+                            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-200 active:scale-95 transition flex justify-center items-center gap-2">
+                            <i class="fas fa-plus-circle"></i> 記上一筆
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Recent Records Preview: 最近幾筆紀錄 -->
+            <div class="px-4 pb-4">
+                <div class="flex justify-between items-center mb-2 px-1">
+                    <h3 class="text-sm font-bold text-gray-700">最近紀錄</h3>
+                    <button onclick="scrollToHistory()" class="text-xs text-indigo-500">查看全部</button>
+                </div>
+                <div id="recentList" class="space-y-2">
+                    <!-- Javascript will populate this -->
+                    <div class="text-center py-4 text-gray-400 text-sm">暫無資料</div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- 歷史資料 Overlay (類似 Modal) -->
+        <div id="historyView" class="absolute inset-0 bg-white transform translate-x-full transition-transform duration-300 z-20 flex flex-col">
+            <div class="bg-gray-100 p-4 pt-8 flex justify-between items-center border-b border-gray-200">
+                <h2 class="font-bold text-lg text-gray-800">歷史明細</h2>
+                <div class="flex gap-2">
+                    <button onclick="clearAllData()" class="text-red-500 text-sm px-3 py-1 bg-white rounded border border-red-200 shadow-sm">
+                        <i class="fas fa-trash-alt mr-1"></i>清空
+                    </button>
+                    <button onclick="toggleHistoryView()" class="text-indigo-600 text-sm px-3 py-1 bg-white rounded border border-indigo-200 shadow-sm">
+                        <i class="fas fa-times mr-1"></i>關閉
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+                <div id="fullHistoryList" class="space-y-3">
+                    <!-- Javascript will populate this -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 狀態管理
+        let records = JSON.parse(localStorage.getItem('vendor_records')) || [];
+
+        // 初始化
+        window.onload = function() {
+            // 設定日期輸入框為今天
+            document.getElementById('dateInput').valueAsDate = new Date();
+            updateUI();
+        };
+
+        // 自動計算實收邏輯
+        function calculateNet() {
+            const revenue = parseInt(document.getElementById('revenueInput').value) || 0;
+            const rent = parseInt(document.getElementById('rentInput').value) || 0;
+            const net = revenue - rent;
+            
+            const display = document.getElementById('calculatedNet');
+            display.innerText = `$${net.toLocaleString()}`;
+            
+            // 動態變色
+            if (net > 0) {
+                display.className = "text-xl font-black text-green-600";
+            } else if (net < 0) {
+                display.className = "text-xl font-black text-red-500";
+            } else {
+                display.className = "text-xl font-black text-gray-400";
+            }
+        }
+
+        // 表單提交
+        document.getElementById('entryForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const date = document.getElementById('dateInput').value;
+            const venue = document.getElementById('venueInput').value;
+            const sales = parseInt(document.getElementById('salesInput').value) || 0;
+            const revenue = parseInt(document.getElementById('revenueInput').value) || 0;
+            const rent = parseInt(document.getElementById('rentInput').value) || 0;
+            const net = revenue - rent;
+
+            const newRecord = {
+                id: Date.now(), // 用時間戳記當 ID
+                date,
+                venue,
+                sales,
+                revenue,
+                rent,
+                net
+            };
+
+            // 加到陣列最前面
+            records.unshift(newRecord);
+            saveData();
+            
+            // 重置表單部分欄位，日期保留
+            document.getElementById('salesInput').value = '';
+            document.getElementById('revenueInput').value = '';
+            document.getElementById('rentInput').value = '';
+            document.getElementById('calculatedNet').innerText = '$0';
+            document.getElementById('calculatedNet').className = "text-xl font-black text-gray-400";
+            
+            // 提示成功 (簡單震動反饋，僅手機有效)
+            if (navigator.vibrate) navigator.vibrate(50);
+            
+            updateUI();
+        });
+
+        // 儲存到 LocalStorage
+        function saveData() {
+            localStorage.setItem('vendor_records', JSON.stringify(records));
+        }
+
+        // 清空資料
+        function clearAllData() {
+            if(confirm("確定要刪除所有紀錄嗎？此動作無法復原。")) {
+                records = [];
+                saveData();
+                updateUI();
+                toggleHistoryView(); // 關閉歷史頁面
+            }
+        }
+
+        // 刪除單筆
+        function deleteRecord(id) {
+            if(confirm("刪除這筆紀錄？")) {
+                records = records.filter(r => r.id !== id);
+                saveData();
+                updateUI();
+            }
+        }
+
+        // 更新 UI (儀表板 + 列表)
+        function updateUI() {
+            // 1. 計算總合
+            let totalNet = 0;
+            let totalRevenue = 0;
+            let totalRent = 0;
+
+            records.forEach(r => {
+                totalNet += r.net;
+                totalRevenue += r.revenue;
+                totalRent += r.rent;
+            });
+
+            document.getElementById('dashboardNet').innerText = `$${totalNet.toLocaleString()}`;
+            document.getElementById('dashboardRevenue').innerText = `$${totalRevenue.toLocaleString()}`;
+            document.getElementById('dashboardRent').innerText = `-$${totalRent.toLocaleString()}`;
+            document.getElementById('totalEventsBadge').innerText = `${records.length} 場`;
+
+            // 2. 渲染列表 (Recent & Full)
+            renderList('recentList', records.slice(0, 3)); // 只顯示前3筆
+            renderList('fullHistoryList', records);
+        }
+
+        // 渲染列表通用函數
+        function renderList(elementId, data) {
+            const container = document.getElementById(elementId);
+            if (data.length === 0) {
+                container.innerHTML = `<div class="text-center py-8 text-gray-400 text-sm flex flex-col items-center"><i class="fas fa-clipboard-list text-3xl mb-2 opacity-30"></i>尚無紀錄</div>`;
+                return;
+            }
+
+            let html = '';
+            data.forEach(r => {
+                const isPositive = r.net >= 0;
+                const netColorClass = isPositive ? 'text-green-600' : 'text-red-500';
+                const netSign = isPositive ? '+' : '';
+                
+                // 格式化日期 (MM/DD)
+                const dateObj = new Date(r.date);
+                const dateStr = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+
+                html += `
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center relative group">
+                    <button onclick="deleteRecord(${r.id})" class="absolute right-2 top-2 text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="flex items-center gap-3">
+                        <div class="bg-gray-100 text-gray-600 font-bold rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs leading-tight">
+                            <span>${dateStr}</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-gray-800 text-sm">${r.venue}</div>
+                            <div class="text-xs text-gray-400 mt-0.5">
+                                營收 ${r.revenue} | 租金 -${r.rent}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs text-gray-400 mb-0.5">實收</div>
+                        <div class="font-bold text-lg ${netColorClass}">${netSign}${r.net.toLocaleString()}</div>
+                    </div>
+                </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // 切換歷史頁面顯示
+        function toggleHistoryView() {
+            const view = document.getElementById('historyView');
+            if (view.classList.contains('translate-x-full')) {
+                view.classList.remove('translate-x-full');
+            } else {
+                view.classList.add('translate-x-full');
+            }
+        }
+
+        function scrollToHistory() {
+            toggleHistoryView();
+        }
+
+    </script>
+</body>
+</html>
