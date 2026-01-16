@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>擺攤記帳小幫手 (雲端版)</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,31 +12,49 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <style>
-        body { -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
-        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        /* 隱藏滾動條但保留功能 */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        /* 修正 iOS 日期輸入框的預設高度與外觀 */
+        /* 核心修正：鎖定視窗，防止輸入時畫面偏移 */
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden; /* 禁止左右滑動 */
+            position: fixed; /* 固定頁面，防止鍵盤彈出時推擠背景 */
+            top: 0;
+            left: 0;
+            overscroll-behavior: none; /* 禁止彈性滾動 */
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+        }
+
+        /* 修正數字輸入框 */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; margin: 0; 
+        }
+
+        /* 修正 iOS 日期輸入框高度 */
         input[type="date"] {
             -webkit-appearance: none;
             appearance: none;
-            min-height: 2.75rem; /* 對應 h-11 */
+            min-height: 2.75rem;
         }
+
+        /* 隱藏滾動條但保留功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 h-[100dvh] overflow-hidden flex flex-col">
+<body class="bg-gray-100 text-gray-800 flex flex-col">
 
     <!-- App Container -->
-    <div class="w-full max-w-md mx-auto bg-white h-full flex flex-col shadow-2xl relative">
+    <!-- 使用 w-full, h-full 確保填滿，並使用 overflow-y-auto 處理內部滾動 -->
+    <div class="w-full h-full max-w-md mx-auto bg-white flex flex-col shadow-2xl relative overflow-hidden">
 
         <!-- Header -->
         <header class="bg-indigo-600 text-white p-4 flex justify-between items-center shadow-md z-10 shrink-0">
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.8</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.9</span>
                 </h1>
                 <p class="text-indigo-200 text-xs flex items-center gap-1" id="userStatus">
                     <i class="fas fa-circle-notch fa-spin"></i> 正在連線雲端...
@@ -52,7 +70,8 @@
             </div>
         </header>
 
-        <main class="flex-1 overflow-y-auto pb-24 bg-gray-50 no-scrollbar" id="mainView">
+        <!-- Main Content: 設定 overflow-y-auto 讓滾動發生在這裡，而不是 body -->
+        <main class="flex-1 overflow-y-auto pb-24 bg-gray-50 no-scrollbar relative" id="mainView">
             
             <!-- Dashboard -->
             <div class="p-4">
@@ -88,7 +107,7 @@
                             <label class="block text-xs font-medium text-gray-500 mb-1">目標業績</label>
                             <div class="relative">
                                 <span class="absolute left-3 top-3 text-gray-400 text-sm">$</span>
-                                <input type="number" id="salesInput" placeholder="0" inputmode="numeric" 
+                                <input type="number" id="salesInput" placeholder="0" inputmode="decimal" 
                                     class="w-full h-11 bg-gray-50 border border-gray-200 rounded-lg pl-7 pr-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                             </div>
                         </div>
@@ -111,12 +130,12 @@
                         <div class="grid grid-cols-2 gap-3 pt-1">
                             <div>
                                 <label class="block text-xs font-medium text-gray-500 mb-1 text-green-600">營收 (+)</label>
-                                <input type="number" id="revenueInput" placeholder="0" inputmode="numeric" oninput="calculateNet()" required 
+                                <input type="number" id="revenueInput" placeholder="0" inputmode="decimal" oninput="calculateNet()" required 
                                     class="w-full h-11 bg-green-50 border border-green-200 rounded-lg px-3 text-base text-green-700 font-bold focus:outline-none focus:ring-2 focus:ring-green-500 transition text-right">
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-gray-500 mb-1 text-red-500">租金 (-)</label>
-                                <input type="number" id="rentInput" placeholder="0" inputmode="numeric" oninput="calculateNet()" required 
+                                <input type="number" id="rentInput" placeholder="0" inputmode="decimal" oninput="calculateNet()" required 
                                     class="w-full h-11 bg-red-50 border border-red-200 rounded-lg px-3 text-base text-red-700 font-bold focus:outline-none focus:ring-2 focus:ring-red-500 transition text-right">
                             </div>
                         </div>
@@ -653,3 +672,5 @@
     </script>
 </body>
 </html>
+
+
