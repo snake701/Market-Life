@@ -29,7 +29,7 @@
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.3.1</span>
                 </h1>
                 <p class="text-indigo-200 text-xs" id="userStatus">正在連線雲端...</p>
             </div>
@@ -96,11 +96,11 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs font-medium text-gray-500 mb-1 text-green-600">營收 (+)</label>
-                                <input type="number" id="revenueInput" placeholder="0" inputmode="numeric" required class="w-full bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-base text-green-700 font-bold focus:outline-none focus:ring-2 focus:ring-green-500 transition text-right">
+                                <input type="number" id="revenueInput" placeholder="0" inputmode="numeric" oninput="calculateNet()" required class="w-full bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-base text-green-700 font-bold focus:outline-none focus:ring-2 focus:ring-green-500 transition text-right">
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-gray-500 mb-1 text-red-500">租金 (-)</label>
-                                <input type="number" id="rentInput" placeholder="0" inputmode="numeric" required class="w-full bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-base text-red-700 font-bold focus:outline-none focus:ring-2 focus:ring-red-500 transition text-right">
+                                <input type="number" id="rentInput" placeholder="0" inputmode="numeric" oninput="calculateNet()" required class="w-full bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-base text-red-700 font-bold focus:outline-none focus:ring-2 focus:ring-red-500 transition text-right">
                             </div>
                         </div>
 
