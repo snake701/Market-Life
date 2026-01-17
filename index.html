@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- ↓↓↓ 改這裡 (瀏覽器標籤名稱) ↓↓↓ -->
     <title>擺攤記帳小幫手 (雲端版)</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -56,8 +57,10 @@
         <header class="bg-indigo-600 text-white p-4 flex justify-between items-center shadow-md z-10 shrink-0">
             <div>
                 <h1 class="text-xl font-bold flex items-center">
-                    <i class="fas fa-cloud mr-2"></i>市集人生
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.7.0</span>
+                    <i class="fas fa-cloud mr-2"></i>
+                    <!-- ↓↓↓ 改這裡 (App 顯示名稱) ↓↓↓ -->
+                    擺攤記帳
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.7.1</span>
                 </h1>
                 <p class="text-indigo-200 text-xs flex items-center gap-1" id="userStatus">
                     <i class="fas fa-circle-notch fa-spin"></i> 正在連線...
@@ -267,6 +270,9 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, getDocs, onSnapshot, query, orderBy, doc, Timestamp, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // ==========================================
+        // Firebase 設定
+        // ==========================================
         const userFirebaseConfig = {
             apiKey: "AIzaSyAtj6uPha5PNX4_c2EIyF-NQ2G8Jshv75g",
             authDomain: "market-life-309fe.firebaseapp.com",
@@ -281,12 +287,14 @@
         let records = [];
         let unsubscribe = null; 
 
+        // 初始化商店代碼
         let currentStoreId = localStorage.getItem('vendor_store_id');
         if (!currentStoreId) {
             currentStoreId = 'store_' + Math.random().toString(36).substr(2, 6).toUpperCase();
             localStorage.setItem('vendor_store_id', currentStoreId);
         }
 
+        // 初始化 APP
         function initApp() {
             try {
                 app = initializeApp(firebaseConfig);
@@ -317,6 +325,7 @@
             }
         }
 
+        // 取得路徑
         function getCollectionRef() {
             return collection(db, 'stores', currentStoreId, 'records');
         }
@@ -375,6 +384,7 @@
                 const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000));
                 await Promise.race([addDoc(collectionRef, newRecord), timeoutPromise]);
 
+                // Reset Form
                 document.getElementById('salesInput').value = '';
                 document.getElementById('revenueInput').value = '';
                 document.getElementById('rentInput').value = '';
