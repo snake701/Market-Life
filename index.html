@@ -47,7 +47,7 @@
             <div>
                 <h1 class="text-xl font-bold flex items-center">
                     <i class="fas fa-cloud mr-2"></i>擺攤記帳
-                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.4.3</span>
+                    <span class="text-xs bg-indigo-500 px-1.5 py-0.5 rounded ml-2 font-normal opacity-80" id="appVersion">v1.5.0</span>
                 </h1>
                 <p class="text-indigo-200 text-xs flex items-center gap-1" id="userStatus">
                     <i class="fas fa-circle-notch fa-spin"></i> 正在連線...
@@ -86,16 +86,24 @@
                     <h2 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4 border-b pb-2">新增紀錄 (同步至雲端)</h2>
                     
                     <form id="entryForm" class="space-y-3">
-                        <!-- 1. 日期 -->
-                        <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">日期</label>
-                            <input type="date" id="dateInput" required 
-                                class="w-full h-11 bg-gray-50 border border-gray-200 rounded-lg px-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                        
+                        <!-- 1. 日期與天數 (新增功能) -->
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="col-span-2">
+                                <label class="block text-xs font-medium text-gray-500 mb-1">開始日期</label>
+                                <input type="date" id="dateInput" required 
+                                    class="w-full h-11 bg-gray-50 border border-gray-200 rounded-lg px-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                            </div>
+                            <div class="col-span-1">
+                                <label class="block text-xs font-medium text-gray-500 mb-1">天數</label>
+                                <input type="number" id="durationInput" value="1" min="1" placeholder="1" inputmode="numeric"
+                                    class="w-full h-11 bg-gray-50 border border-gray-200 rounded-lg px-3 text-base text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                            </div>
                         </div>
 
                         <!-- 2. 目標業績 -->
                         <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">目標業績</label>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">目標業績 (總計)</label>
                             <div class="relative">
                                 <span class="absolute left-3 top-3 text-gray-400 text-sm">$</span>
                                 <input type="number" id="salesInput" placeholder="0" inputmode="decimal" 
@@ -120,12 +128,12 @@
                         <!-- 5. 營收與租金 -->
                         <div class="grid grid-cols-2 gap-3 pt-1">
                             <div>
-                                <label class="block text-xs font-medium text-gray-500 mb-1 text-green-600">營收 (+)</label>
+                                <label class="block text-xs font-medium text-gray-500 mb-1 text-green-600">總營收 (+)</label>
                                 <input type="number" id="revenueInput" placeholder="0" inputmode="decimal" oninput="calculateNet()" required 
                                     class="w-full h-11 bg-green-50 border border-green-200 rounded-lg px-3 text-base text-green-700 font-bold focus:outline-none focus:ring-2 focus:ring-green-500 transition text-right">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-gray-500 mb-1 text-red-500">租金 (-)</label>
+                                <label class="block text-xs font-medium text-gray-500 mb-1 text-red-500">總租金 (-)</label>
                                 <input type="number" id="rentInput" placeholder="0" inputmode="decimal" oninput="calculateNet()" required 
                                     class="w-full h-11 bg-red-50 border border-red-200 rounded-lg px-3 text-base text-red-700 font-bold focus:outline-none focus:ring-2 focus:ring-red-500 transition text-right">
                             </div>
@@ -133,7 +141,7 @@
 
                         <div class="pt-2">
                             <div class="flex justify-between items-end bg-gray-100 rounded-lg p-3">
-                                <span class="text-xs font-bold text-gray-500">本日實收 Net</span>
+                                <span class="text-xs font-bold text-gray-500">本檔實收 Net</span>
                                 <span id="calculatedNet" class="text-xl font-black text-gray-400">$0</span>
                             </div>
                         </div>
@@ -163,7 +171,6 @@
                 <h2 class="font-bold text-lg text-gray-800">歷史明細 (雲端)</h2>
                 <input type="file" id="importFile" accept=".xlsx, .xls" class="hidden">
                 <div class="flex gap-2">
-                    <!-- 新增：清空按鈕 -->
                     <button id="btnDeleteAll" class="text-red-500 text-sm px-3 py-1 bg-white rounded border border-red-200 shadow-sm hover:bg-red-50 transition">
                         <i class="fas fa-trash-alt mr-1"></i>清空
                     </button>
@@ -247,10 +254,7 @@
             appId: "1:143823003012:web:fd53ef47c12aab9317d1d1"
         };
 
-        // 系統邏輯 - 強制使用使用者配置
         const firebaseConfig = userFirebaseConfig;
-
-        // 初始化變數
         let app, auth, db, user;
         let records = [];
         let unsubscribe = null; 
@@ -331,6 +335,7 @@
 
             try {
                 const date = document.getElementById('dateInput').value;
+                const duration = parseInt(document.getElementById('durationInput').value) || 1;
                 const venue = document.getElementById('venueInput').value;
                 const organizer = document.getElementById('organizerInput').value;
                 const sales = parseInt(document.getElementById('salesInput').value) || 0;
@@ -339,21 +344,22 @@
                 const net = revenue - rent;
 
                 const newRecord = {
-                    date, venue, organizer, sales, revenue, rent, net,
+                    date, duration, venue, organizer, sales, revenue, rent, net,
                     createdAt: Timestamp.now(),
                     createdBy: user.uid
                 };
 
                 const collectionRef = getCollectionRef();
-                
                 const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000));
                 await Promise.race([addDoc(collectionRef, newRecord), timeoutPromise]);
 
+                // Reset Form
                 document.getElementById('salesInput').value = '';
                 document.getElementById('revenueInput').value = '';
                 document.getElementById('rentInput').value = '';
                 document.getElementById('venueInput').value = '';
                 document.getElementById('organizerInput').value = '';
+                document.getElementById('durationInput').value = '1';
                 document.getElementById('calculatedNet').innerText = '$0';
                 document.getElementById('calculatedNet').className = "text-xl font-black text-gray-400";
                 
@@ -372,7 +378,6 @@
             }
         }
 
-        // 單筆刪除功能
         window.deleteRecord = async function(docId) {
             if(!confirm("確定要刪除這筆紀錄嗎？")) return;
             try {
@@ -384,13 +389,10 @@
             }
         };
 
-        // 清空全部資料功能
+        // 清空全部
         document.getElementById('btnDeleteAll').onclick = async function() {
             if (records.length === 0) { alert("目前沒有資料可以清空"); return; }
-            const confirmMsg = `警告：您即將刪除本商店 (${currentStoreId}) 的所有 ${records.length} 筆資料。\n\n此動作【無法復原】！\n\n確定要繼續嗎？`;
-            if (!confirm(confirmMsg)) return;
-            
-            // 二次確認
+            if (!confirm(`警告：您即將刪除所有 ${records.length} 筆資料。\n此動作【無法復原】！`)) return;
             if (!confirm("請再次確認：真的要清空所有資料嗎？")) return;
 
             const btn = document.getElementById('btnDeleteAll');
@@ -401,12 +403,8 @@
             try {
                 const collectionRef = getCollectionRef();
                 const snapshot = await getDocs(collectionRef);
-                
-                // Firestore 批次刪除限制為 500 筆，這裡簡單實作迴圈刪除
-                // 若資料量極大建議分批，但一般擺攤紀錄應足夠
                 const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
                 await Promise.all(deletePromises);
-                
                 alert("已成功清空所有資料。");
             } catch (error) {
                 console.error("清空失敗:", error);
@@ -434,6 +432,7 @@
                         if(row['日期'] && row['場地']) {
                             await addDoc(collectionRef, {
                                 date: row['日期'],
+                                duration: parseInt(row['天數']) || 1, // 兼容舊版Excel
                                 venue: row['場地'],
                                 organizer: row['主辦單位'] || '',
                                 sales: parseInt(row['目標業績']) || 0,
@@ -511,13 +510,25 @@
             }
             el.innerHTML = data.map(r => {
                 const color = r.net >= 0 ? 'text-green-600' : 'text-red-500';
-                const dateStr = new Date(r.date).toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'});
+                
+                // 計算日期範圍
+                const start = new Date(r.date);
+                const duration = parseInt(r.duration) || 1;
+                let dateStr = start.toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'});
+                
+                if (duration > 1) {
+                    const end = new Date(start);
+                    end.setDate(start.getDate() + duration - 1);
+                    dateStr += ` ~ ${end.toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'})} (${duration}天)`;
+                }
+
                 const org = r.organizer ? `<div class="text-xs text-indigo-500 mb-0.5"><i class="fas fa-user-tag mr-1 text-[10px]"></i>${r.organizer}</div>` : '';
+                
                 return `
                 <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center relative group">
                     <button onclick="deleteRecord('${r.id}')" class="absolute right-2 top-2 text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition z-10"><i class="fas fa-trash-alt"></i></button>
                     <div class="flex items-center gap-3">
-                        <div class="bg-gray-100 text-gray-600 font-bold rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs leading-tight"><span>${dateStr}</span></div>
+                        <div class="bg-gray-100 text-gray-600 font-bold rounded-lg w-16 h-12 flex flex-col items-center justify-center text-[10px] leading-tight text-center px-1"><span>${dateStr}</span></div>
                         <div>
                             <div class="font-bold text-gray-800 text-sm">${r.venue}</div>
                             ${org}
@@ -545,7 +556,9 @@
         document.getElementById('entryForm').onsubmit = addRecord;
         document.getElementById('btnExport').onclick = () => {
             if(!records.length) return alert("無資料");
-            const data = [["日期", "場地", "主辦單位", "目標業績", "營收", "租金", "實收"], ...records.map(r => [r.date, r.venue, r.organizer, r.sales, r.revenue, r.rent, r.net])];
+            // 更新匯出欄位包含天數
+            const data = [["日期", "天數", "場地", "主辦單位", "目標業績", "營收", "租金", "實收"], 
+                ...records.map(r => [r.date, r.duration||1, r.venue, r.organizer, r.sales, r.revenue, r.rent, r.net])];
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), "紀錄");
             XLSX.writeFile(wb, `擺攤紀錄_${currentStoreId}.xlsx`);
